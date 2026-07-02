@@ -1,0 +1,13 @@
+{
+  "name": "epdf_tool",
+  "private": true,
+  "scripts": {
+    "flutter": "fvm flutter",
+    "run": "fvm flutter run",
+    "analyze": "fvm flutter analyze",
+    "test": "fvm flutter test",
+    "build:android": "fvm flutter build apk --release",
+    "build:android:bundle": "fvm flutter build appbundle --release",
+    "build:ios": "fvm flutter build ios --release --no-codesign"
+  }
+}

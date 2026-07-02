@@ -1,0 +1,29 @@
+
+# Flutter and Dart tooling
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+build/
+coverage/
+
+# FVM version cache
+.fvm/
+
+# IDE files
+.idea/
+*.iml
+.vscode/*
+!.vscode/launch.json
+
+# Node.js artifacts
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
