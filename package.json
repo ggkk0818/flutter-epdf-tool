@@ -8,6 +8,7 @@
     "test": "fvm flutter test",
     "build:android": "fvm flutter build apk --release",
     "build:android:bundle": "fvm flutter build appbundle --release",
-    "build:ios": "fvm flutter build ios --release --no-codesign"
+    "build:ios": "fvm flutter build ios --release --no-codesign",
+    "icons": "fvm flutter pub run flutter_launcher_icons:main"
   }
 }
