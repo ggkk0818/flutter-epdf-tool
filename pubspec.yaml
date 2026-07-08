@@ -47,6 +47,8 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+  flutter_launcher_icons: ^0.14.4
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -88,3 +90,12 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/app_icon.png"
+  
+  # 【重要】Android 8.0 以上需要自适应图标，建议配置背景色和前景图
+  adaptive_icon_background: "#FFFFFF" # 背景色，或者填背景图片路径 "assets/bg.png"
+  adaptive_icon_foreground: "assets/images/app_icon.png" # 前景图
