@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/devices/add_device_page.dart';
 import '../features/devices/devices_page.dart';
 import '../features/documents/document_page.dart';
 import '../features/remote/remote_page.dart';
@@ -48,6 +49,13 @@ final GoRouter appRouter = GoRouter(
           },
         ),
       ],
+    ),
+    GoRoute(
+      path: '/devices/add',
+      name: 'add_device',
+      builder: (BuildContext context, GoRouterState state) {
+        return const AddDevicePage();
+      },
     ),
   ],
 );

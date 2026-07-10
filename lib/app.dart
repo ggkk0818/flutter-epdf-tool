@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'router/app_router.dart';
 
-class EpdfToolApp extends StatelessWidget {
+class EpdfToolApp extends ConsumerWidget {
   const EpdfToolApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'EPDF Tool',
       theme: ThemeData(
