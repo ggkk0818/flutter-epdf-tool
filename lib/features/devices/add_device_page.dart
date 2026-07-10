@@ -49,9 +49,6 @@ class _AddDevicePageState extends ConsumerState<AddDevicePage> {
       Permission.bluetoothScan,
       Permission.bluetoothConnect,
     ];
-    if (await Permission.location.isDenied) {
-      requests.add(Permission.location);
-    }
     final statuses = await requests.request();
     final denied = statuses.entries
         .where((e) => !e.value.isGranted)

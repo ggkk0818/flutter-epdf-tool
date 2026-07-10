@@ -15,15 +15,10 @@ class DevicesPage extends ConsumerWidget {
     final currentId = ref.watch(currentDeviceIdProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('设备'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: '添加设备',
-            onPressed: () => context.go('/devices/add'),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.push('/devices/add'),
+        tooltip: '添加设备',
+        child: const Icon(Icons.add),
       ),
       body: paired.when(
         data: (list) => list.isEmpty
@@ -111,7 +106,7 @@ class _EmptyState extends StatelessWidget {
           Text('还没有添加设备', style: theme.textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(
-            '点击右上角 + 添加 EPDF 设备',
+            '点击右下角 + 添加 EPDF 设备',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
