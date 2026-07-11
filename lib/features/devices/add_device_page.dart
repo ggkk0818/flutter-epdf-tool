@@ -161,7 +161,8 @@ class _AddDevicePageState extends ConsumerState<AddDevicePage> {
     try {
       await FlutterBluePlus.stopScan();
       await FlutterBluePlus.startScan(
-        withServices: [BleConstants.epdfServiceUuid],
+        // withServices: [BleConstants.epdfServiceUuid],
+        withKeywords: ['EPDF'],
         timeout: const Duration(seconds: 10),
       );
     } on Object catch (e) {

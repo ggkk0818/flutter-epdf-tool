@@ -1,11 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 告訴 Google Play Store 您的應用使用藍牙低功耗（BLE）
+        如果藍牙是必需的，請將 android:required 設置為 "true" -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
+    <!-- Android 12 中的新藍牙權限
+        https://developer.android.com/about/versions/12/features/bluetooth-permissions -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- 適用於 Android 11 或更低版本的舊版權限 -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission
-        android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30"/>
+
+    <!-- 適用於 Android 9 或更低版本的舊版權限 -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="28" />
     <application
         android:label="EPDF"
         android:name="${applicationName}"
