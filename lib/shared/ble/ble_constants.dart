@@ -15,5 +15,14 @@ class BleConstants {
   static const String cmdGetDeviceInfo = 'get_device_info';
   static const String respDeviceInfo = 'device_info_resp';
 
+  static const String cmdGetList = 'get_list';
+  static const String respList = 'list_resp';
+
   static const Duration getDeviceInfoTimeout = Duration(seconds: 10);
+  static const Duration getListTimeout = Duration(seconds: 10);
+
+  static const int connectRetryCount = 3;
+  static const Duration connectRetryDelay = Duration(milliseconds: 500);
+
+  static const Duration deviceInfoRefreshInterval = Duration(minutes: 1);
 }

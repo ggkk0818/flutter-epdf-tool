@@ -78,4 +78,51 @@ class BleService {
       }
     }
   }
+
+  /// Re-sends get_device_info on an established connection and awaits
+  /// device_info_resp. Used for periodic refresh while connected.
+  Future<DeviceInfo> refreshDeviceInfo(BleConnection connection) async {
+    final completer = Completer<DeviceInfo>();
+    final sub = connection.cmdMessages.listen((msg) {
+      if (msg['cmd'] == BleConstants.respDeviceInfo) {
+        final data = msg['data'];
+        if (data is Map<String, dynamic> && !completer.isCompleted) {
+          completer.complete(DeviceInfo.fromJson(data));
+        }
+      }
+    });
+    try {
+      await connection.sendCommand(const {'cmd': BleConstants.cmdGetDeviceInfo});
+      return await completer.future.timeout(BleConstants.getDeviceInfoTimeout);
+    } finally {
+      await sub.cancel();
+    }
+  }
+
+  /// Sends get_list on an established connection and awaits list_resp.
+  /// Returns an empty list when the device reports no documents.
+  Future<List<DocumentMeta>> fetchDocumentList(BleConnection connection) async {
+    final completer = Completer<List<DocumentMeta>>();
+    final sub = connection.cmdMessages.listen((msg) {
+      if (msg['cmd'] == BleConstants.respList) {
+        final data = msg['data'];
+        if (data is Map<String, dynamic> && !completer.isCompleted) {
+          final files = data['files'];
+          final List<DocumentMeta> docs = files is List
+              ? files
+                  .whereType<Map<String, dynamic>>()
+                  .map(DocumentMeta.fromJson)
+                  .toList(growable: false)
+              : const <DocumentMeta>[];
+          completer.complete(docs);
+        }
+      }
+    });
+    try {
+      await connection.sendCommand(const {'cmd': BleConstants.cmdGetList});
+      return await completer.future.timeout(BleConstants.getListTimeout);
+    } finally {
+      await sub.cancel();
+    }
+  }
 }

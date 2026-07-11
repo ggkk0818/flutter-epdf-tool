@@ -61,6 +61,39 @@ class DeviceInfo {
   }
 }
 
+class DocumentMeta {
+  const DocumentMeta({
+    required this.name,
+    required this.time,
+    required this.pages,
+  });
+
+  factory DocumentMeta.fromJson(Map<String, dynamic> json) {
+    return DocumentMeta(
+      name: (json['name'] as String?) ?? '',
+      time: (json['time'] as String?) ?? '',
+      pages: _readInt(json, 'pages'),
+    );
+  }
+
+  final String name;
+  final String time;
+  final int pages;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'time': time,
+        'pages': pages,
+      };
+
+  static int _readInt(Map<String, dynamic> json, String key) {
+    final v = json[key];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return 0;
+  }
+}
+
 class PairedDevice {
   const PairedDevice({
     required this.remoteId,

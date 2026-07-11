@@ -6,11 +6,67 @@ import '../../state/ble_providers.dart';
 import '../../shared/ble/models.dart';
 import 'widgets/device_list_item.dart';
 
-class DevicesPage extends ConsumerWidget {
+class DevicesPage extends ConsumerStatefulWidget {
   const DevicesPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DevicesPage> createState() => _DevicesPageState();
+}
+
+class _DevicesPageState extends ConsumerState<DevicesPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(activeConnectionProvider.notifier).reconnectIfOffline();
+    });
+  }
+
+  Future<void> _onSelectDevice(PairedDevice device) async {
+    final notifier = ref.read(currentDeviceIdProvider.notifier);
+    final activeNotifier = ref.read(activeConnectionProvider.notifier);
+    await notifier.set(device.remoteId);
+    await activeNotifier.connectTo(device);
+  }
+
+  Future<void> _onDeleteDevice(
+    BuildContext context,
+    WidgetRef ref,
+    PairedDevice device,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除设备'),
+        content: Text(
+          '确定删除「${device.displayName.isEmpty ? device.remoteId : device.displayName}」吗？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final currentId = ref.read(currentDeviceIdProvider);
+    if (currentId == device.remoteId) {
+      await ref.read(activeConnectionProvider.notifier).disconnect();
+      await ref.read(currentDeviceIdProvider.notifier).set(null);
+    }
+    await ref.read(pairedDevicesProvider.notifier).remove(device.remoteId);
+    messenger.showSnackBar(const SnackBar(content: Text('已删除设备')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final paired = ref.watch(pairedDevicesProvider);
     final currentId = ref.watch(currentDeviceIdProvider);
 
@@ -34,7 +90,7 @@ class DevicesPage extends ConsumerWidget {
                   return DeviceListItem(
                     device: d,
                     isSelected: d.remoteId == currentId,
-                    onTap: () => _onSelectDevice(ref, d),
+                    onTap: () => _onSelectDevice(d),
                     onDelete: () => _onDeleteDevice(context, ref, d),
                   );
                 },
@@ -43,47 +99,6 @@ class DevicesPage extends ConsumerWidget {
         error: (e, _) => Center(child: Text('读取失败: $e')),
       ),
     );
-  }
-
-  Future<void> _onSelectDevice(WidgetRef ref, PairedDevice device) async {
-    final notifier = ref.read(currentDeviceIdProvider.notifier);
-    final activeNotifier = ref.read(activeConnectionProvider.notifier);
-    await notifier.set(device.remoteId);
-    await activeNotifier.connectTo(device);
-  }
-
-  Future<void> _onDeleteDevice(
-    BuildContext context,
-    WidgetRef ref,
-    PairedDevice device,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除设备'),
-        content: Text('确定删除「${device.displayName.isEmpty ? device.remoteId : device.displayName}」吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    final currentId = ref.read(currentDeviceIdProvider);
-    if (currentId == device.remoteId) {
-      await ref.read(activeConnectionProvider.notifier).disconnect();
-      await ref.read(currentDeviceIdProvider.notifier).set(null);
-    }
-    await ref.read(pairedDevicesProvider.notifier).remove(device.remoteId);
-    messenger.showSnackBar(const SnackBar(content: Text('已删除设备')));
   }
 }
 

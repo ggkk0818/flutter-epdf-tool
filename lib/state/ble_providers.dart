@@ -4,6 +4,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../shared/ble/ble_connection.dart';
+import '../shared/ble/ble_constants.dart';
 import '../shared/ble/ble_service.dart';
 import '../shared/ble/models.dart';
 import '../shared/storage/device_store.dart';
@@ -100,21 +101,25 @@ class ActiveConnection {
     this.connection,
     this.info,
     this.bluetoothState = BluetoothConnectionState.disconnected,
+    this.isOffline = false,
   });
 
   final BleConnection? connection;
   final DeviceInfo? info;
   final BluetoothConnectionState bluetoothState;
+  final bool isOffline;
 
   ActiveConnection copyWith({
     BleConnection? connection,
     DeviceInfo? info,
     BluetoothConnectionState? bluetoothState,
+    bool? isOffline,
   }) {
     return ActiveConnection(
       connection: connection ?? this.connection,
       info: info ?? this.info,
       bluetoothState: bluetoothState ?? this.bluetoothState,
+      isOffline: isOffline ?? this.isOffline,
     );
   }
 }
@@ -128,53 +133,169 @@ class ActiveConnectionNotifier
 
   BluetoothDevice? _device;
   StreamSubscription<BluetoothConnectionState>? _stateSub;
+  Timer? _refreshTimer;
   String? _activeId;
+  PairedDevice? _lastPaired;
+  bool _isForeground = true;
+  bool _isConnecting = false;
 
-  Future<void> connectTo(PairedDevice paired) async {
-    if (_activeId == paired.remoteId) return;
-    await _cancel();
-    _activeId = paired.remoteId;
+  Future<void> connectTo(PairedDevice paired) =>
+      _doConnect(paired, force: false);
 
-    state = AsyncValue<ActiveConnection>.loading().copyWithPrevious(state);
+  /// Re-connect to the last paired device if currently offline or without
+  /// a live connection. Triggered by app foreground / devices-page enter.
+  Future<void> reconnectIfOffline() async {
+    if (_isConnecting) return;
+    final paired = _lastPaired;
+    if (paired == null) return;
+    final current = state.valueOrNull;
+    final needsReconnect =
+        current == null || current.isOffline || current.connection == null;
+    if (needsReconnect) {
+      await _doConnect(paired, force: true);
+    }
+  }
 
-    final device = BluetoothDevice.fromId(paired.remoteId);
-    _device = device;
-    _stateSub = device.connectionState.listen((s) {
-      final current = state.valueOrNull;
-      if (current == null) return;
-      state = AsyncValue.data(current.copyWith(bluetoothState: s));
-    });
-
-    try {
-      final result =
-          await _ref.read(bleServiceProvider).connectAndQueryInfo(device);
-      final next = ActiveConnection(
-        connection: result.connection,
-        info: result.info,
-        bluetoothState: device.isConnected
-            ? BluetoothConnectionState.connected
-            : BluetoothConnectionState.disconnected,
-      );
-      state = AsyncValue.data(next);
-      unawaited(
-        _ref
-            .read(pairedDevicesProvider.notifier)
-            .updateCachedInfo(paired.remoteId, result.info),
-      );
-    } on Object catch (e, st) {
-      state = AsyncValue.error(e, st);
-      await _ref.read(bleServiceProvider).disconnect();
-      _device = null;
-      _activeId = null;
+  /// Pause periodic refresh when app goes background; resume on foreground.
+  void setForeground(bool foreground) {
+    _isForeground = foreground;
+    if (!foreground) {
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+      return;
+    }
+    final current = state.valueOrNull;
+    final connected = current != null &&
+        !current.isOffline &&
+        current.connection != null &&
+        current.bluetoothState == BluetoothConnectionState.connected;
+    if (connected) {
+      _startRefreshTimer();
+      unawaited(_tickRefresh());
     }
   }
 
   Future<void> disconnect() async {
     await _cancel();
+    _lastPaired = null;
     state = const AsyncValue.data(ActiveConnection());
   }
 
+  Future<void> _doConnect(PairedDevice paired, {required bool force}) async {
+    if (_isConnecting) return;
+    if (!force && _activeId == paired.remoteId) return;
+    _isConnecting = true;
+    try {
+      await _cancel();
+      _activeId = paired.remoteId;
+      _lastPaired = paired;
+      _device = BluetoothDevice.fromId(paired.remoteId);
+
+      state = AsyncValue<ActiveConnection>.loading().copyWithPrevious(state);
+
+      _stateSub = _device!.connectionState.listen((s) {
+        final current = state.valueOrNull;
+        if (current == null) return;
+        if (s == BluetoothConnectionState.connected) {
+          state = AsyncValue.data(current.copyWith(bluetoothState: s));
+        } else {
+          // Drop the connection reference so downstream callers don't try
+          // to use a stale BleConnection.
+          state = AsyncValue.data(ActiveConnection(
+            info: current.info,
+            bluetoothState: s,
+            isOffline: current.isOffline,
+          ));
+          _refreshTimer?.cancel();
+          _refreshTimer = null;
+        }
+      });
+
+      try {
+        final result = await _connectWithRetry(_device!);
+        state = AsyncValue.data(ActiveConnection(
+          connection: result.connection,
+          info: result.info,
+          bluetoothState: BluetoothConnectionState.connected,
+        ));
+        _startRefreshTimer();
+        unawaited(
+          _ref
+              .read(pairedDevicesProvider.notifier)
+              .updateCachedInfo(paired.remoteId, result.info),
+        );
+      } on Object {
+        await _stateSub?.cancel();
+        _stateSub = null;
+        await _ref.read(bleServiceProvider).disconnect();
+        try {
+          await _device?.disconnect();
+        } on Object {
+          // best effort
+        }
+        _device = null;
+        // Keep _activeId and _lastPaired so reconnectIfOffline can retry.
+        state = const AsyncValue.data(ActiveConnection(isOffline: true));
+      }
+    } finally {
+      _isConnecting = false;
+    }
+  }
+
+  Future<ConnectResult> _connectWithRetry(BluetoothDevice device) async {
+    Object? lastError;
+    for (int i = 0; i < BleConstants.connectRetryCount; i++) {
+      try {
+        return await _ref.read(bleServiceProvider).connectAndQueryInfo(device);
+      } on Object catch (e) {
+        lastError = e;
+        await _ref.read(bleServiceProvider).disconnect();
+        try {
+          await device.disconnect();
+        } on Object {
+          // best effort — partial connects need cleanup before retry
+        }
+        if (i < BleConstants.connectRetryCount - 1) {
+          await Future.delayed(BleConstants.connectRetryDelay);
+        }
+      }
+    }
+    throw lastError ?? StateError('connect failed');
+  }
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(
+      BleConstants.deviceInfoRefreshInterval,
+      (_) => _tickRefresh(),
+    );
+  }
+
+  Future<void> _tickRefresh() async {
+    if (!_isForeground) return;
+    final conn = state.valueOrNull?.connection;
+    if (conn == null) return;
+    try {
+      final info = await _ref.read(bleServiceProvider).refreshDeviceInfo(conn);
+      final current = state.valueOrNull;
+      if (current == null) return;
+      state = AsyncValue.data(current.copyWith(info: info));
+      final paired = _lastPaired;
+      if (paired != null) {
+        unawaited(
+          _ref
+              .read(pairedDevicesProvider.notifier)
+              .updateCachedInfo(paired.remoteId, info),
+        );
+      }
+    } on Object {
+      // best effort — keep current state
+    }
+  }
+
   Future<void> _cancel() async {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
     await _stateSub?.cancel();
     _stateSub = null;
     if (_device != null) {
@@ -186,6 +307,8 @@ class ActiveConnectionNotifier
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
     _stateSub?.cancel();
     super.dispose();
   }

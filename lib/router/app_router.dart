@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../features/devices/add_device_page.dart';
 import '../features/devices/devices_page.dart';
+import '../features/documents/add_document_page.dart';
+import '../features/documents/document_detail_page.dart';
 import '../features/documents/document_page.dart';
 import '../features/remote/remote_page.dart';
 import '../shared/widgets/app_shell.dart';
@@ -55,6 +57,20 @@ final GoRouter appRouter = GoRouter(
       name: 'add_device',
       builder: (BuildContext context, GoRouterState state) {
         return const AddDevicePage();
+      },
+    ),
+    GoRoute(
+      path: '/documents/detail',
+      name: 'document_detail',
+      builder: (BuildContext context, GoRouterState state) {
+        return const DocumentDetailPage();
+      },
+    ),
+    GoRoute(
+      path: '/documents/add',
+      name: 'add_document',
+      builder: (BuildContext context, GoRouterState state) {
+        return const AddDocumentPage();
       },
     ),
   ],

@@ -36,6 +36,10 @@ class DeviceStatusChip extends ConsumerWidget {
         bg = colorScheme.primaryContainer;
         fg = colorScheme.onPrimaryContainer;
         icon = Icons.bluetooth_connected;
+      } else if (activeConn.valueOrNull?.isOffline == true) {
+        label = '${paired.displayName}（离线）';
+        icon = Icons.cloud_off;
+        fg = colorScheme.error;
       } else if (activeConn.isLoading) {
         label = '正在连接 ${paired.displayName}…';
         icon = Icons.bluetooth_searching;
