@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,6 +35,23 @@ class _DocumentPageState extends ConsumerState<DocumentPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<ActiveConnection>>(activeConnectionProvider, (
+      previous,
+      next,
+    ) {
+      final prev = previous?.valueOrNull;
+      final current = next.valueOrNull;
+      final justConnected =
+          current?.connection != null &&
+          current?.isOffline == false &&
+          (prev?.connection == null ||
+              prev?.connection?.device.remoteId.str !=
+                  current!.connection!.device.remoteId.str);
+      if (justConnected) {
+        unawaited(ref.read(documentListProvider.notifier).refresh());
+      }
+    });
+
     final asyncList = ref.watch(documentListProvider);
 
     return Stack(
@@ -56,10 +75,8 @@ class _DocumentPageState extends ConsumerState<DocumentPage> {
                         )
                       : ListView.separated(
                           itemCount: list.length,
-                          separatorBuilder: (_, _) => const Divider(
-                            height: 1,
-                            indent: 52,
-                          ),
+                          separatorBuilder: (_, _) =>
+                              const Divider(height: 1, indent: 52),
                           itemBuilder: (BuildContext context, int index) {
                             final meta = list[index];
                             return DocumentListItem(
@@ -71,13 +88,10 @@ class _DocumentPageState extends ConsumerState<DocumentPage> {
                             );
                           },
                         ),
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                  error: (e, _) => _ErrorState(
-                    message: '$e',
-                    onRetry: _refresh,
-                  ),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) =>
+                      _ErrorState(message: '$e', onRetry: _refresh),
                 ),
               ),
             ),
@@ -110,8 +124,7 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.folder_open,
             size: 64,
-            color:
-                theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
           ),
           const SizedBox(height: 12),
           Text('暂无文档', style: theme.textTheme.titleMedium),
