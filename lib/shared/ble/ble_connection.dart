@@ -23,10 +23,14 @@ class BleConnection {
   final LineBuffer _lineBuffer = LineBuffer();
   final StreamController<Map<String, dynamic>> _cmdController =
       StreamController<Map<String, dynamic>>.broadcast();
+    final StreamController<Uint8List> _dataController =
+      StreamController<Uint8List>.broadcast();
 
   StreamSubscription<List<int>>? _cmdSubscription;
+    StreamSubscription<List<int>>? _dataSubscription;
 
   Stream<Map<String, dynamic>> get cmdMessages => _cmdController.stream;
+    Stream<Uint8List> get dataPackets => _dataController.stream;
 
   int get mtuNow => device.mtuNow;
 
@@ -53,6 +57,9 @@ class BleConnection {
     if (!cmd.isNotifying) {
       await cmd.setNotifyValue(true);
     }
+    if (!data.isNotifying) {
+      await data.setNotifyValue(true);
+    }
 
     final connection = BleConnection._(
       device: device,
@@ -60,6 +67,7 @@ class BleConnection {
       dataCharacteristic: data,
     );
     connection._listenCmd(cmd);
+    connection._listenData(data);
     return connection;
   }
 
@@ -73,6 +81,13 @@ class BleConnection {
           _cmdController.add(msg);
         }
       }
+    });
+  }
+
+  void _listenData(BluetoothCharacteristic data) {
+    _dataSubscription = data.lastValueStream.listen((List<int> chunk) {
+      if (chunk.isEmpty) return;
+      _dataController.add(Uint8List.fromList(chunk));
     });
   }
 
@@ -90,7 +105,10 @@ class BleConnection {
   Future<void> dispose() async {
     await _cmdSubscription?.cancel();
     _cmdSubscription = null;
+    await _dataSubscription?.cancel();
+    _dataSubscription = null;
     await _cmdController.close();
+    await _dataController.close();
     _lineBuffer.clear();
   }
 }

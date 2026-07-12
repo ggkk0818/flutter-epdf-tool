@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
@@ -14,6 +15,20 @@ class ConnectResult {
 
   final BleConnection connection;
   final DeviceInfo info;
+}
+
+class PreviewPageResult {
+  const PreviewPageResult({
+    required this.pageIndex,
+    required this.bytes,
+    required this.width,
+    required this.height,
+  });
+
+  final int pageIndex;
+  final Uint8List bytes;
+  final int width;
+  final int height;
 }
 
 class BleService {
@@ -126,6 +141,122 @@ class BleService {
       return await completer.future.timeout(BleConstants.getListTimeout);
     } finally {
       await sub.cancel();
+    }
+  }
+
+  Future<void> deleteDocument({
+    required BleConnection connection,
+    required DocumentMeta meta,
+  }) async {
+    final completer = Completer<String>();
+    final sub = connection.cmdMessages.listen((msg) {
+      if (msg['cmd'] != BleConstants.respDelete) {
+        return;
+      }
+      final data = msg['data'];
+      if (data is! Map<String, dynamic>) {
+        return;
+      }
+      if (!_matchesDocumentMeta(data, meta)) {
+        return;
+      }
+      final status = data['status'] as String? ?? 'error';
+      if (!completer.isCompleted) {
+        completer.complete(status);
+      }
+    });
+
+    try {
+      await connection.sendCommand({
+        'cmd': BleConstants.cmdDelete,
+        'data': meta.toJson(),
+      });
+      final status = await completer.future.timeout(BleConstants.deleteTimeout);
+      if (status != 'ok') {
+        throw DocumentTransferException(_deleteMessage(status));
+      }
+    } on TimeoutException catch (e) {
+      throw DocumentTransferException('删除文档超时，请重试。', e);
+    } on DocumentTransferException {
+      rethrow;
+    } on Object catch (e) {
+      throw DocumentTransferException('删除文档失败，请稍后重试。', e);
+    } finally {
+      await sub.cancel();
+    }
+  }
+
+  Future<PreviewPageResult> fetchPreviewPage({
+    required BleConnection connection,
+    required DocumentMeta meta,
+    required int pageIndex,
+  }) async {
+    final bytesBuilder = BytesBuilder(copy: false);
+    final completer = Completer<Map<String, dynamic>>();
+    final dataSub = connection.dataPackets.listen(bytesBuilder.add);
+    final cmdSub = connection.cmdMessages.listen((msg) {
+      final cmd = msg['cmd'] as String?;
+      if (cmd == BleConstants.respPreviewError) {
+        if (!completer.isCompleted) {
+          completer.complete(msg);
+        }
+        return;
+      }
+      if (cmd != BleConstants.respPreviewEnd) {
+        return;
+      }
+      final responsePage = _readInt(msg['page']);
+      if (responsePage != pageIndex) {
+        return;
+      }
+      if (!completer.isCompleted) {
+        completer.complete(msg);
+      }
+    });
+
+    try {
+      await connection.sendCommand({
+        'cmd': BleConstants.cmdPreview,
+        'data': {
+          ...meta.toJson(),
+          'page': pageIndex,
+        },
+      });
+      final message = await completer.future.timeout(BleConstants.previewTimeout);
+      final cmd = message['cmd'] as String?;
+      if (cmd == BleConstants.respPreviewError) {
+        final status = message['status'] as String? ?? 'error';
+        throw DocumentTransferException(_previewStartMessage(status));
+      }
+
+      final status = message['status'] as String? ?? 'error';
+      if (status != 'ok') {
+        throw DocumentTransferException(_previewEndMessage(status));
+      }
+
+      final bytes = bytesBuilder.takeBytes();
+      final expectedBytes = _readInt(message['bytes']);
+      if (expectedBytes > 0 && bytes.length != expectedBytes) {
+        throw DocumentTransferException(
+          '预览数据长度异常，期望 $expectedBytes 字节，实际 ${bytes.length} 字节。',
+        );
+      }
+
+      return PreviewPageResult(
+        pageIndex: pageIndex,
+        bytes: bytes,
+        width: _readInt(message['width']),
+        height: _readInt(message['height']),
+      );
+    } on TimeoutException catch (e) {
+      throw DocumentTransferException('加载预览超时，请保持设备连接稳定。', e);
+    } on DocumentTransferException {
+      rethrow;
+    } on Object catch (e) {
+      throw DocumentTransferException('加载预览失败，请稍后重试。', e);
+    } finally {
+      await dataSub.cancel();
+      await cmdSub.cancel();
     }
   }
 
@@ -262,5 +393,54 @@ class BleService {
       default:
         return '设备未能完成文档传输。';
     }
+  }
+
+  String _deleteMessage(String status) {
+    switch (status) {
+      case 'bad_dir_name':
+        return '设备没有找到该文档，请刷新列表后重试。';
+      default:
+        return '设备删除文档失败。';
+    }
+  }
+
+  String _previewStartMessage(String status) {
+    switch (status) {
+      case 'busy':
+        return '设备正在处理其他任务，请稍后再试。';
+      case 'bad_dir_name':
+        return '设备没有找到该文档，请刷新列表后重试。';
+      case 'out_of_range':
+        return '请求的页码超出文档范围。';
+      case 'not_found':
+        return '设备未找到该页预览文件。';
+      default:
+        return '设备拒绝加载预览。';
+    }
+  }
+
+  String _previewEndMessage(String status) {
+    switch (status) {
+      case 'io_error':
+        return '设备读取预览文件失败，请重试。';
+      default:
+        return '设备未能完成预览数据传输。';
+    }
+  }
+
+  bool _matchesDocumentMeta(Map<String, dynamic> json, DocumentMeta meta) {
+    return (json['name'] as String? ?? '') == meta.name &&
+        (json['time'] as String? ?? '') == meta.time &&
+        _readInt(json['pages']) == meta.pages;
+  }
+
+  int _readInt(Object? value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    return 0;
   }
 }

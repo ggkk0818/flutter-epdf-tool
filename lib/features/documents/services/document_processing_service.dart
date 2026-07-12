@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:pdfrx/pdfrx.dart';
 
+import '../../../shared/ble/epdf_page_bin_codec.dart';
 import '../../../shared/ble/models.dart';
 import '../../../shared/storage/document_cache_store.dart';
 import '../document_naming.dart';
@@ -106,7 +106,7 @@ class DocumentProcessingService {
       final binPath = p.join(tempDir.path, 'page_$pageNumber.bin');
 
       await File(previewPath).writeAsBytes(img.encodePng(displayImage));
-      await File(binPath).writeAsBytes(_encodeBin(displayImage));
+      await File(binPath).writeAsBytes(EpdfPageBinCodec.encode(displayImage));
 
       preparedPages.add(
         PreparedDocumentPage(
@@ -233,33 +233,6 @@ class DocumentProcessingService {
     }
     return flattened;
   }
-
-  Uint8List _encodeBin(img.Image image) {
-    final header = ByteData(8)
-      ..setUint8(0, 0xE5)
-      ..setUint8(1, 0x01)
-      ..setUint16(2, image.width, Endian.little)
-      ..setUint16(4, image.height, Endian.little)
-      ..setUint16(6, 0, Endian.little);
-
-    final rowBytes = (image.width + 7) ~/ 8;
-    final body = Uint8List(rowBytes * image.height);
-    for (int y = 0; y < image.height; y++) {
-      for (int x = 0; x < image.width; x++) {
-        final pixel = image.getPixel(x, y);
-        if (pixel.r < 128) {
-          final offset = y * rowBytes + (x ~/ 8);
-          body[offset] |= 0x80 >> (x % 8);
-        }
-      }
-    }
-
-    final output = BytesBuilder(copy: false);
-    output.add(header.buffer.asUint8List());
-    output.add(body);
-    return output.takeBytes();
-  }
-
   ({int width, int height}) _fitWithin(
     int width,
     int height,

@@ -6,6 +6,7 @@ import '../features/devices/devices_page.dart';
 import '../features/documents/add_document_page.dart';
 import '../features/documents/document_detail_page.dart';
 import '../features/documents/document_page.dart';
+import '../features/documents/document_preview_page.dart';
 import '../features/remote/remote_page.dart';
 import '../shared/widgets/app_shell.dart';
 
@@ -64,6 +65,17 @@ final GoRouter appRouter = GoRouter(
       name: 'document_detail',
       builder: (BuildContext context, GoRouterState state) {
         return const DocumentDetailPage();
+      },
+    ),
+    GoRoute(
+      path: '/documents/preview',
+      name: 'document_preview',
+      builder: (BuildContext context, GoRouterState state) {
+        final args = state.extra as DocumentPreviewPageArgs?;
+        if (args == null) {
+          return const DocumentDetailPage();
+        }
+        return DocumentPreviewPage(args: args);
       },
     ),
     GoRoute(
