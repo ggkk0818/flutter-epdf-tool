@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../../shared/ble/ble_constants.dart';
 import '../../shared/ble/ble_service.dart';
 import '../../shared/ble/models.dart';
 import '../../state/ble_providers.dart';

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../router/app_router.dart';
 import '../../shared/widgets/device_status_chip.dart';
 import '../../state/ble_providers.dart';
 import '../../state/document_providers.dart';
@@ -26,6 +27,10 @@ class _DocumentPageState extends ConsumerState<DocumentPage> {
   }
 
   Future<void> _refresh() async {
+    final pageStatus = ref.read(documentPageStatusProvider);
+    if (pageStatus == DocumentPageStatus.noDevice) {
+      return;
+    }
     final conn = ref.read(activeConnectionProvider).valueOrNull?.connection;
     if (conn == null) {
       await ref.read(activeConnectionProvider.notifier).reconnectIfOffline();
@@ -52,7 +57,65 @@ class _DocumentPageState extends ConsumerState<DocumentPage> {
       }
     });
 
+    final pageStatus = ref.watch(documentPageStatusProvider);
     final asyncList = ref.watch(documentListProvider);
+    final canAddDocument = pageStatus == DocumentPageStatus.ready;
+
+    Widget buildBody() {
+      switch (pageStatus) {
+        case DocumentPageStatus.connecting:
+          return const Center(child: CircularProgressIndicator());
+        case DocumentPageStatus.noDevice:
+          return ListView(
+            children: [
+              SizedBox(height: 120),
+              _DeviceCtaState(
+                icon: Icons.bluetooth_searching,
+                title: '还没有选择设备',
+                message: '请先去设备页添加并选择 EPDF 设备',
+              ),
+            ],
+          );
+        case DocumentPageStatus.offline:
+          return ListView(
+            children: [
+              SizedBox(height: 120),
+              _DeviceCtaState(
+                icon: Icons.cloud_off,
+                title: '设备当前离线',
+                message: '请前往设备页重新连接设备后再查看或添加文档',
+              ),
+            ],
+          );
+        case DocumentPageStatus.ready:
+          return asyncList.when(
+            data: (list) => list.isEmpty
+                ? ListView(
+                    children: const [
+                      SizedBox(height: 120),
+                      _EmptyState(),
+                    ],
+                  )
+                : ListView.separated(
+                    itemCount: list.length,
+                    separatorBuilder: (_, _) =>
+                        const Divider(height: 1, indent: 52),
+                    itemBuilder: (BuildContext context, int index) {
+                      final meta = list[index];
+                      return DocumentListItem(
+                        document: meta,
+                        onTap: () => context.push(
+                          '/documents/detail',
+                          extra: meta,
+                        ),
+                      );
+                    },
+                  ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => _ErrorState(message: '$e', onRetry: _refresh),
+          );
+      }
+    }
 
     return Stack(
       children: [
@@ -65,48 +128,70 @@ class _DocumentPageState extends ConsumerState<DocumentPage> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _refresh,
-                child: asyncList.when(
-                  data: (list) => list.isEmpty
-                      ? ListView(
-                          children: const [
-                            SizedBox(height: 120),
-                            _EmptyState(),
-                          ],
-                        )
-                      : ListView.separated(
-                          itemCount: list.length,
-                          separatorBuilder: (_, _) =>
-                              const Divider(height: 1, indent: 52),
-                          itemBuilder: (BuildContext context, int index) {
-                            final meta = list[index];
-                            return DocumentListItem(
-                              document: meta,
-                              onTap: () => context.push(
-                                '/documents/detail',
-                                extra: meta,
-                              ),
-                            );
-                          },
-                        ),
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) =>
-                      _ErrorState(message: '$e', onRetry: _refresh),
-                ),
+                child: buildBody(),
               ),
             ),
           ],
         ),
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: FloatingActionButton(
-            onPressed: () => context.push('/documents/add'),
-            tooltip: '添加文档',
-            child: const Icon(Icons.add),
+        if (canAddDocument)
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: FloatingActionButton(
+              onPressed: () => context.push('/documents/add'),
+              tooltip: '添加文档',
+              child: const Icon(Icons.add),
+            ),
           ),
-        ),
       ],
+    );
+  }
+}
+
+class _DeviceCtaState extends StatelessWidget {
+  const _DeviceCtaState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 64,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+            const SizedBox(height: 12),
+            Text(title, style: theme.textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.tonalIcon(
+              onPressed: () => context.go(AppSection.devices.path),
+              icon: const Icon(Icons.bluetooth_searching),
+              label: const Text('前往设备页'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
