@@ -113,10 +113,7 @@ class DocumentDetailPage extends ConsumerWidget {
       }
       context.push(
         '/documents/preview',
-        extra: DocumentPreviewPageArgs(
-          meta: meta,
-          initialPage: pageIndex,
-        ),
+        extra: DocumentPreviewPageArgs(meta: meta, initialPage: pageIndex),
       );
     } on Object catch (e) {
       if (!context.mounted) {
@@ -164,22 +161,12 @@ class DocumentDetailPage extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: cachedPath == null
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.description_outlined,
-                            size: 48,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(height: 8),
-                          Text('点击预览', style: theme.textTheme.bodyMedium),
-                        ],
+                    ? Icon(
+                        Icons.description_outlined,
+                        size: 48,
+                        color: theme.colorScheme.primary,
                       )
-                    : Image.file(
-                        File(cachedPath),
-                        fit: BoxFit.contain,
-                      ),
+                    : Image.file(File(cachedPath), fit: BoxFit.contain),
               ),
               Positioned(
                 left: 8,
@@ -188,7 +175,6 @@ class DocumentDetailPage extends ConsumerWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
