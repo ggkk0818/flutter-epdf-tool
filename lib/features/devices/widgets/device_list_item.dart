@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/ble/models.dart';
+import '../../../shared/storage/storage_display.dart';
 
 class DeviceListItem extends StatelessWidget {
   const DeviceListItem({
@@ -56,6 +57,8 @@ class DeviceListItem extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       _buildSubtitle(device.cachedInfo),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: isSelected
                             ? colorScheme.onPrimaryContainer
@@ -85,13 +88,13 @@ class DeviceListItem extends StatelessWidget {
     if (info == null) {
       return '未获取设备信息';
     }
-    final parts = <String>[
+    final summary = <String>[
       '电量 ${info.batteryLevel}%',
-      '存储 ${info.storageUsedMb}/${info.storageTotalMb} MB',
-    ];
-    if (info.firmwareVersion.isNotEmpty) {
-      parts.add('固件 v${info.firmwareVersion}');
+      '存储 ${formatStorageUsage(info.storageUsedMb, info.storageTotalMb)}',
+    ].join(' · ');
+    if (info.firmwareVersion.isEmpty) {
+      return summary;
     }
-    return parts.join(' · ');
+    return '$summary\n固件 v${info.firmwareVersion}';
   }
 }

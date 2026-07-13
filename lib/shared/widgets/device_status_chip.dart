@@ -3,6 +3,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../storage/storage_display.dart';
 import '../../state/ble_providers.dart';
 
 class DeviceStatusChip extends ConsumerWidget {
@@ -15,7 +16,10 @@ class DeviceStatusChip extends ConsumerWidget {
     final activeConn = ref.watch(activeConnectionProvider);
     final paired = ref.watch(currentPairedDeviceProvider);
 
-    String label;
+    String? label;
+    String? connectedDeviceName;
+    int? batteryLevel;
+    String? storageUsage;
     Color? bg;
     Color? fg;
     IconData icon = Icons.bluetooth;
@@ -29,10 +33,13 @@ class DeviceStatusChip extends ConsumerWidget {
           connState == BluetoothConnectionState.connected;
       final info = activeConn.valueOrNull?.info ?? paired.cachedInfo;
       if (info != null && connected) {
-        label =
-            '${info.deviceName.isEmpty ? paired.displayName : info.deviceName} · '
-            '电量 ${info.batteryLevel}% · '
-            '${info.storageUsedMb}/${info.storageTotalMb} MB';
+        connectedDeviceName =
+            info.deviceName.isEmpty ? paired.displayName : info.deviceName;
+        batteryLevel = info.batteryLevel;
+        storageUsage = formatStorageUsage(
+          info.storageUsedMb,
+          info.storageTotalMb,
+        );
         bg = colorScheme.primaryContainer;
         fg = colorScheme.onPrimaryContainer;
         icon = Icons.bluetooth_connected;
@@ -50,6 +57,11 @@ class DeviceStatusChip extends ConsumerWidget {
       }
     }
 
+    final foreground = fg ?? colorScheme.onSurfaceVariant;
+    final labelStyle = theme.textTheme.labelLarge?.copyWith(
+      color: foreground,
+    );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Material(
@@ -60,30 +72,84 @@ class DeviceStatusChip extends ConsumerWidget {
           borderRadius: BorderRadius.circular(24),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 16, color: fg ?? colorScheme.onSurfaceVariant),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    label,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: fg ?? colorScheme.onSurfaceVariant,
-                    ),
+            child: SizedBox(
+              width: double.infinity,
+              child: Row(
+                children: [
+                  Icon(icon, size: 16, color: foreground),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: connectedDeviceName != null &&
+                            batteryLevel != null &&
+                            storageUsage != null
+                        ? Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  connectedDeviceName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: labelStyle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _StatusMetrics(
+                                batteryLevel: batteryLevel,
+                                storageUsage: storageUsage,
+                                color: foreground,
+                                textStyle: labelStyle,
+                              ),
+                            ],
+                          )
+                        : Text(
+                            label ?? '',
+                            overflow: TextOverflow.ellipsis,
+                            style: labelStyle,
+                          ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right,
-                  size: 18,
-                  color: fg ?? colorScheme.onSurfaceVariant,
-                ),
-              ],
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: foreground,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StatusMetrics extends StatelessWidget {
+  const _StatusMetrics({
+    required this.batteryLevel,
+    required this.storageUsage,
+    required this.color,
+    required this.textStyle,
+  });
+
+  final int batteryLevel;
+  final String storageUsage;
+  final Color color;
+  final TextStyle? textStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTextStyle.merge(
+      style: textStyle,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.battery_std, size: 14, color: color),
+          const SizedBox(width: 2),
+          Text('$batteryLevel%'),
+          const SizedBox(width: 8),
+          Icon(Icons.sd_storage, size: 14, color: color),
+          const SizedBox(width: 2),
+          Text(storageUsage),
+        ],
       ),
     );
   }
