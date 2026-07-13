@@ -42,21 +42,21 @@ class DocumentDetailPage extends ConsumerWidget {
     }
 
     try {
-      await ref.read(documentDetailControllerProvider.notifier).deleteDocument(meta);
+      await ref
+          .read(documentDetailControllerProvider.notifier)
+          .deleteDocument(meta);
       if (!context.mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('文档已删除')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('文档已删除')));
       context.pop();
     } on Object catch (e) {
       if (!context.mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
@@ -78,29 +78,7 @@ class DocumentDetailPage extends ConsumerWidget {
                 title: const Text('预览'),
                 onTap: () async {
                   Navigator.of(bottomSheetContext).pop();
-                  try {
-                    await ref.read(documentDetailControllerProvider.notifier).ensurePreviewPageCached(
-                          meta: meta,
-                          pageIndex: pageIndex,
-                        );
-                    if (!context.mounted) {
-                      return;
-                    }
-                    context.push(
-                      '/documents/preview',
-                      extra: DocumentPreviewPageArgs(
-                        meta: meta,
-                        initialPage: pageIndex,
-                      ),
-                    );
-                  } on Object catch (e) {
-                    if (!context.mounted) {
-                      return;
-                    }
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('$e')),
-                    );
-                  }
+                  await _openPreview(context, ref, meta, pageIndex);
                 },
               ),
               ListTile(
@@ -108,9 +86,9 @@ class DocumentDetailPage extends ConsumerWidget {
                 title: const Text('在设备上打开'),
                 onTap: () {
                   Navigator.of(bottomSheetContext).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('暂未实现')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('暂未实现')));
                 },
               ),
             ],
@@ -118,6 +96,34 @@ class DocumentDetailPage extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<void> _openPreview(
+    BuildContext context,
+    WidgetRef ref,
+    DocumentMeta meta,
+    int pageIndex,
+  ) async {
+    try {
+      await ref
+          .read(documentDetailControllerProvider.notifier)
+          .ensurePreviewPageCached(meta: meta, pageIndex: pageIndex);
+      if (!context.mounted) {
+        return;
+      }
+      context.push(
+        '/documents/preview',
+        extra: DocumentPreviewPageArgs(
+          meta: meta,
+          initialPage: pageIndex,
+        ),
+      );
+    } on Object catch (e) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
   }
 
   Map<int, String> _buildCachedPageMap(List<String> paths) {
@@ -142,64 +148,65 @@ class DocumentDetailPage extends ConsumerWidget {
     required ThemeData theme,
     required int index,
     required String? cachedPath,
+    required VoidCallback? onTap,
     required VoidCallback? onLongPress,
   }) {
-    return Material(
-      color: theme.colorScheme.surfaceContainerHighest,
+    return ClipRRect(
       borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onLongPress: onLongPress,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: cachedPath == null
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.description_outlined,
-                          size: 48,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '长按操作',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+      child: Material(
+        color: theme.colorScheme.surfaceContainerHighest,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: cachedPath == null
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.description_outlined,
+                            size: 48,
+                            color: theme.colorScheme.primary,
                           ),
-                        ),
-                      ],
-                    )
-                  : Image.file(
-                      File(cachedPath),
-                      fit: BoxFit.contain,
+                          const SizedBox(height: 8),
+                          Text('点击预览', style: theme.textTheme.bodyMedium),
+                        ],
+                      )
+                    : Image.file(
+                        File(cachedPath),
+                        fit: BoxFit.contain,
+                      ),
+              ),
+              Positioned(
+                left: 8,
+                right: 8,
+                bottom: 8,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-            ),
-            Positioned(
-              left: 8,
-              right: 8,
-              bottom: 8,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Text(
-                    '第${index + 1}页',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: Colors.white,
+                    child: Text(
+                      '第${index + 1}页',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -273,7 +280,10 @@ class DocumentDetailPage extends ConsumerWidget {
                     theme: theme,
                     index: index,
                     cachedPath: cachedPageMap[index],
-                    onLongPress: detailState.isDeleting
+                    onTap: detailState.isBusy
+                        ? null
+                        : () => _openPreview(context, ref, meta, index),
+                    onLongPress: detailState.isBusy
                         ? null
                         : () => _showPageActions(context, ref, meta, index),
                   );
@@ -296,7 +306,10 @@ class DocumentDetailPage extends ConsumerWidget {
                   theme: theme,
                   index: index,
                   cachedPath: null,
-                  onLongPress: detailState.isDeleting
+                  onTap: detailState.isBusy
+                      ? null
+                      : () => _openPreview(context, ref, meta, index),
+                  onLongPress: detailState.isBusy
                       ? null
                       : () => _showPageActions(context, ref, meta, index),
                 );
@@ -314,7 +327,10 @@ class DocumentDetailPage extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 20,
+                      ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
