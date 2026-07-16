@@ -86,9 +86,7 @@ class DocumentDetailPage extends ConsumerWidget {
                 title: const Text('在设备上打开'),
                 onTap: () {
                   Navigator.of(bottomSheetContext).pop();
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('暂未实现')));
+                  _openOnDevice(context, ref, meta, pageIndex);
                 },
               ),
             ],
@@ -114,6 +112,30 @@ class DocumentDetailPage extends ConsumerWidget {
       context.push(
         '/documents/preview',
         extra: DocumentPreviewPageArgs(meta: meta, initialPage: pageIndex),
+      );
+    } on Object catch (e) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _openOnDevice(
+    BuildContext context,
+    WidgetRef ref,
+    DocumentMeta meta,
+    int pageIndex,
+  ) async {
+    try {
+      await ref
+          .read(documentDetailControllerProvider.notifier)
+          .viewOnDevice(meta: meta, pageIndex: pageIndex);
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已在设备上打开')),
       );
     } on Object catch (e) {
       if (!context.mounted) {
@@ -323,7 +345,11 @@ class DocumentDetailPage extends ConsumerWidget {
                           const CircularProgressIndicator(),
                           const SizedBox(height: 12),
                           Text(
-                            detailState.isDeleting ? '正在删除文档...' : '正在加载预览...',
+                            detailState.isDeleting
+                                ? '正在删除文档...'
+                                : detailState.viewingOnDevice
+                                    ? '正在设备上打开...'
+                                    : '正在加载预览...',
                             style: theme.textTheme.bodyMedium,
                           ),
                         ],

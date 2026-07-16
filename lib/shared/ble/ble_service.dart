@@ -260,6 +260,63 @@ class BleService {
     }
   }
 
+  Future<void> viewOnDevice({
+    required BleConnection connection,
+    required DocumentMeta meta,
+    required int pageIndex,
+  }) async {
+    final completer = Completer<String>();
+    final sub = connection.cmdMessages.listen((msg) {
+      final cmd = msg['cmd'] as String?;
+      if (cmd != BleConstants.respViewOnDevice) {
+        return;
+      }
+      final responsePage = _readInt(msg['page']);
+      if (responsePage != pageIndex) {
+        return;
+      }
+      if (!completer.isCompleted) {
+        completer.complete((msg['status'] as String?) ?? 'error');
+      }
+    });
+
+    try {
+      await connection.sendCommand({
+        'cmd': BleConstants.cmdViewOnDevice,
+        'data': {
+          ...meta.toJson(),
+          'page': pageIndex,
+        },
+      });
+      final status =
+          await completer.future.timeout(BleConstants.viewOnDeviceTimeout);
+      if (status != 'ok') {
+        throw DocumentTransferException(_viewOnDeviceMessage(status));
+      }
+    } on TimeoutException catch (e) {
+      throw DocumentTransferException('在设备上打开超时，请保持设备连接稳定。', e);
+    } on DocumentTransferException {
+      rethrow;
+    } on Object catch (e) {
+      throw DocumentTransferException('在设备上打开失败，请稍后重试。', e);
+    } finally {
+      await sub.cancel();
+    }
+  }
+
+  String _viewOnDeviceMessage(String status) {
+    switch (status) {
+      case 'busy':
+        return '设备正在处理其他任务，请稍后再试。';
+      case 'bad_dir_name':
+        return '设备没有找到该文档，请刷新列表后重试。';
+      case 'out_of_range':
+        return '请求的页码超出文档范围。';
+      default:
+        return '设备拒绝在设备上打开。';
+    }
+  }
+
   Future<void> uploadPreparedDocument({
     required BleConnection connection,
     required String name,

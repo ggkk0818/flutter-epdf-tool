@@ -12,20 +12,25 @@ class DocumentDetailState {
   const DocumentDetailState({
     this.isDeleting = false,
     this.previewingPages = const <int>{},
+    this.viewingOnDevice = false,
   });
 
   final bool isDeleting;
   final Set<int> previewingPages;
+  final bool viewingOnDevice;
 
-  bool get isBusy => isDeleting || previewingPages.isNotEmpty;
+  bool get isBusy =>
+      isDeleting || previewingPages.isNotEmpty || viewingOnDevice;
 
   DocumentDetailState copyWith({
     bool? isDeleting,
     Set<int>? previewingPages,
+    bool? viewingOnDevice,
   }) {
     return DocumentDetailState(
       isDeleting: isDeleting ?? this.isDeleting,
       previewingPages: previewingPages ?? this.previewingPages,
+      viewingOnDevice: viewingOnDevice ?? this.viewingOnDevice,
     );
   }
 }
@@ -61,6 +66,31 @@ class DocumentDetailController extends StateNotifier<DocumentDetailState> {
       await _ref.read(documentListProvider.notifier).refresh();
     } finally {
       state = state.copyWith(isDeleting: false);
+    }
+  }
+
+  Future<void> viewOnDevice({
+    required DocumentMeta meta,
+    required int pageIndex,
+  }) async {
+    if (state.viewingOnDevice) {
+      return;
+    }
+
+    final connection = _ref.read(activeConnectionProvider).valueOrNull?.connection;
+    if (connection == null) {
+      throw const DocumentTransferException('设备连接已断开，请重新连接后再试。');
+    }
+
+    state = state.copyWith(viewingOnDevice: true);
+    try {
+      await _ref.read(bleServiceProvider).viewOnDevice(
+            connection: connection,
+            meta: meta,
+            pageIndex: pageIndex,
+          );
+    } finally {
+      state = state.copyWith(viewingOnDevice: false);
     }
   }
 

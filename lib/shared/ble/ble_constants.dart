@@ -25,6 +25,9 @@ class BleConstants {
   static const String respPreviewEnd = 'preview_end';
   static const String respPreviewError = 'preview_error';
 
+  static const String cmdViewOnDevice = 'view_on_device';
+  static const String respViewOnDevice = 'view_on_device_resp';
+
   static const String cmdUploadStart = 'upload_start';
   static const String respUploadAck = 'upload_ack';
   static const String respUploadError = 'upload_error';
@@ -36,6 +39,7 @@ class BleConstants {
   static const Duration getListTimeout = Duration(seconds: 10);
   static const Duration deleteTimeout = Duration(seconds: 10);
   static const Duration previewTimeout = Duration(seconds: 20);
+  static const Duration viewOnDeviceTimeout = Duration(seconds: 10);
   static const Duration uploadStartTimeout = Duration(seconds: 10);
   static const Duration uploadPageAckTimeout = Duration(seconds: 20);
   static const Duration uploadEndTimeout = Duration(seconds: 15);
