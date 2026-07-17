@@ -7,6 +7,7 @@ import '../features/documents/add_document_page.dart';
 import '../features/documents/document_detail_page.dart';
 import '../features/documents/document_page.dart';
 import '../features/documents/document_preview_page.dart';
+import '../features/remote/remote_mode_page.dart';
 import '../features/remote/remote_page.dart';
 import '../shared/widgets/app_shell.dart';
 
@@ -83,6 +84,13 @@ final GoRouter appRouter = GoRouter(
       name: 'add_document',
       builder: (BuildContext context, GoRouterState state) {
         return const AddDocumentPage();
+      },
+    ),
+    GoRoute(
+      path: '/remote/mode',
+      name: 'remote_mode',
+      builder: (BuildContext context, GoRouterState state) {
+        return const RemoteModePage();
       },
     ),
   ],

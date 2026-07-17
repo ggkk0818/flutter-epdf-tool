@@ -35,6 +35,15 @@ class BleConstants {
   static const String cmdUploadEnd = 'upload_end';
   static const String respUploadEnd = 'upload_end_resp';
 
+  static const String cmdInputEvent = 'input_event';
+  static const String respInputEvent = 'input_event_resp';
+
+  // Event names sent inside input_event.data.event and echoed back in the resp.
+  static const String inputEventEnter = 'enter';
+  static const String inputEventBack = 'back';
+  static const String inputEventUpLeft = 'up_left';
+  static const String inputEventDownRight = 'down_right';
+
   static const Duration getDeviceInfoTimeout = Duration(seconds: 10);
   static const Duration getListTimeout = Duration(seconds: 10);
   static const Duration deleteTimeout = Duration(seconds: 10);
@@ -44,6 +53,7 @@ class BleConstants {
   static const Duration uploadPageAckTimeout = Duration(seconds: 20);
   static const Duration uploadEndTimeout = Duration(seconds: 15);
   static const Duration uploadChunkSpacing = Duration(milliseconds: 6);
+  static const Duration inputEventTimeout = Duration(seconds: 2);
 
   static const int uploadChunkCeiling = 180;
 

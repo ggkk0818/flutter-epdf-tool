@@ -31,6 +31,27 @@ class PreviewPageResult {
   final int height;
 }
 
+/// Reason codes for [BleService.sendInputEvent] failures. Lets the caller
+/// surface a specific reason to the user (timeout vs. device rejected vs.
+/// transport error).
+enum RemoteInputFailure {
+  unknownEvent,
+  deviceError,
+  timeout,
+  transport,
+}
+
+class RemoteInputException implements Exception {
+  const RemoteInputException(this.failure, this.message, [this.cause]);
+
+  final RemoteInputFailure failure;
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => 'RemoteInputException($failure): $message';
+}
+
 class BleService {
   BleConnection? _active;
   BluetoothDevice? _activeDevice;
@@ -299,6 +320,66 @@ class BleService {
       rethrow;
     } on Object catch (e) {
       throw DocumentTransferException('在设备上打开失败，请稍后重试。', e);
+    } finally {
+      await sub.cancel();
+    }
+  }
+
+  /// Sends an input_event command and awaits the matching response. The device
+  /// injects the event into its input queue and replies with status="ok" once
+  /// it has accepted the event (or "unknown_event" if the name is not
+  /// recognized). Throws [RemoteInputException] on timeout, unknown event, or
+  /// transport-level failure so the caller can surface the reason.
+  Future<void> sendInputEvent({
+    required BleConnection connection,
+    required String event,
+  }) async {
+    final completer = Completer<String>();
+    final sub = connection.cmdMessages.listen((msg) {
+      final cmd = msg['cmd'] as String?;
+      if (cmd != BleConstants.respInputEvent) {
+        return;
+      }
+      final echoed = msg['event'] as String?;
+      if (echoed != event) {
+        return;
+      }
+      if (!completer.isCompleted) {
+        completer.complete((msg['status'] as String?) ?? 'error');
+      }
+    });
+
+    try {
+      await connection.sendCommand({
+        'cmd': BleConstants.cmdInputEvent,
+        'data': {'event': event},
+      });
+      final status = await completer.future
+          .timeout(BleConstants.inputEventTimeout);
+      if (status == 'ok') return;
+      if (status == 'unknown_event') {
+        throw const RemoteInputException(
+          RemoteInputFailure.unknownEvent,
+          '设备未识别该遥控事件。',
+        );
+      }
+      throw RemoteInputException(
+        RemoteInputFailure.deviceError,
+        '设备处理遥控指令失败。',
+      );
+    } on TimeoutException {
+      throw const RemoteInputException(
+        RemoteInputFailure.timeout,
+        '遥控指令超时，请保持设备连接稳定。',
+      );
+    } on RemoteInputException {
+      rethrow;
+    } on Object catch (e) {
+      throw RemoteInputException(
+        RemoteInputFailure.transport,
+        '遥控指令发送失败，蓝牙连接可能已断开。',
+        e,
+      );
     } finally {
       await sub.cancel();
     }
