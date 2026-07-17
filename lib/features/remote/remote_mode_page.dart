@@ -124,8 +124,8 @@ class _RemoteModePageState extends ConsumerState<RemoteModePage> {
     final double dx = delta.dx;
     final double dy = delta.dy;
     if (dx.abs() >= dy.abs()) {
-      // Horizontal: right → next, left → prev.
-      _emit(dx >= 0
+      // Horizontal: left → next, right → prev.
+      _emit(dx < 0
           ? BleConstants.inputEventDownRight
           : BleConstants.inputEventUpLeft);
     } else {
@@ -150,22 +150,25 @@ class _RemoteModePageState extends ConsumerState<RemoteModePage> {
       _exit(reason: '设备连接已断开');
       return;
     }
-    setState(() => _busy = true);
+    // _busy gates new gestures silently — no setState, no visual cue. The
+    // spec requires loading to be imperceptible; we just drop inputs that
+    // arrive while a round-trip is in flight.
+    _busy = true;
     try {
       await ref.read(bleServiceProvider).sendInputEvent(
             connection: conn,
             event: event,
           );
       if (_disposed || !mounted) return;
-      setState(() => _busy = false);
+      _busy = false;
       _resetGesture();
     } on RemoteInputException catch (e) {
       if (_disposed || !mounted) return;
-      setState(() => _busy = false);
+      _busy = false;
       _exit(reason: e.message);
     } on Object catch (e) {
       if (_disposed || !mounted) return;
-      setState(() => _busy = false);
+      _busy = false;
       _exit(reason: '遥控指令失败：$e');
     }
   }
@@ -241,7 +244,7 @@ class _RemoteModePageState extends ConsumerState<RemoteModePage> {
                 onPointerCancel: _onPointerCancel,
               ),
             ),
-            // Layer 3: subtle hint at top while idle.
+            // Layer 3: subtle static hint at top.
             Positioned(
               top: 0,
               left: 0,
@@ -251,15 +254,11 @@ class _RemoteModePageState extends ConsumerState<RemoteModePage> {
                 child: Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: Center(
-                    child: AnimatedOpacity(
-                      opacity: _busy ? 0.0 : 1.0,
-                      duration: const Duration(milliseconds: 200),
-                      child: Text(
-                        '滑动翻页 · 点按确认 · 长按返回',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.45),
-                          fontSize: 12,
-                        ),
+                    child: Text(
+                      '滑动翻页 · 点按确认 · 长按返回',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.45),
+                        fontSize: 12,
                       ),
                     ),
                   ),
@@ -295,29 +294,6 @@ class _RemoteModePageState extends ConsumerState<RemoteModePage> {
                 ),
               ),
             ),
-            // Layer 5: silent loading overlay (above gesture area but below
-            // exit button so the user can still bail out).
-            if (_busy)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 96,
-                child: IgnorePointer(
-                  child: Container(
-                    color: Colors.black.withValues(alpha: 0.55),
-                    alignment: Alignment.center,
-                    child: const SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
