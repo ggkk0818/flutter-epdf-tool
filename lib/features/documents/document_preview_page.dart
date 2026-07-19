@@ -78,6 +78,49 @@ class _DocumentPreviewPageState extends ConsumerState<DocumentPreviewPage> {
     _warmPages(pageIndex);
   }
 
+  Future<void> _showImageActions(int pageIndex) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (BuildContext bottomSheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.open_in_new_outlined),
+                title: const Text('在设备上打开'),
+                onTap: () {
+                  Navigator.of(bottomSheetContext).pop();
+                  _openOnDevice(pageIndex);
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openOnDevice(int pageIndex) async {
+    try {
+      await ref
+          .read(documentDetailControllerProvider.notifier)
+          .viewOnDevice(meta: _meta, pageIndex: pageIndex);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已在设备上打开')),
+      );
+    } on Object catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -130,13 +173,16 @@ class _DocumentPreviewPageState extends ConsumerState<DocumentPreviewPage> {
                 );
               }
 
-              return InteractiveViewer(
-                minScale: 1,
-                maxScale: 5,
-                child: Center(
-                  child: Image.file(
-                    File(path),
-                    fit: BoxFit.contain,
+              return GestureDetector(
+                onLongPress: () => _showImageActions(index),
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 5,
+                  child: Center(
+                    child: Image.file(
+                      File(path),
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               );

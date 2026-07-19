@@ -89,6 +89,7 @@ class DocumentDetailPage extends ConsumerWidget {
                   _openOnDevice(context, ref, meta, pageIndex);
                 },
               ),
+              SizedBox(height: 12),
             ],
           ),
         );
