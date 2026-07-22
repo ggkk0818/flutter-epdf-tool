@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/devices/add_device_page.dart';
 import '../features/devices/devices_page.dart';
+import '../features/devices/ota_update_page.dart';
 import '../features/documents/add_document_page.dart';
 import '../features/documents/document_detail_page.dart';
 import '../features/documents/document_page.dart';
@@ -59,6 +60,17 @@ final GoRouter appRouter = GoRouter(
       name: 'add_device',
       builder: (BuildContext context, GoRouterState state) {
         return const AddDevicePage();
+      },
+    ),
+    GoRoute(
+      path: '/devices/ota',
+      name: 'device_ota',
+      builder: (BuildContext context, GoRouterState state) {
+        final args = state.extra as OtaUpdatePageArgs?;
+        if (args == null) {
+          return const DevicesPage();
+        }
+        return OtaUpdatePage(args: args);
       },
     ),
     GoRoute(

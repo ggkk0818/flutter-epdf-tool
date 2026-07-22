@@ -10,6 +10,38 @@ class BleConstants {
   static final Guid dataCharUuid =
       Guid('0000ffe2-0000-1000-8000-00805f9b34fb');
 
+  // OTA service — separate from EPDF service so OTA traffic does not collide
+  // with the JSON cmd protocol or PDF data stream.
+  static final Guid otaServiceUuid =
+      Guid('0000ff00-0000-1000-8000-00805f9b34fb');
+  static final Guid otaCtrlCharUuid =
+      Guid('0000ff01-0000-1000-8000-00805f9b34fb');
+  static final Guid otaDataCharUuid =
+      Guid('0000ff02-0000-1000-8000-00805f9b34fb');
+
+  // OTA protocol bytes — must match cfg::ota in Config.h on the ESP32 side.
+  static const int otaCmdStart = 0x01;
+  static const int otaCmdPause = 0x02;
+  static const int otaCmdResume = 0x03;
+  static const int otaCmdEnd = 0x04;
+  static const int otaCmdReboot = 0x05;
+
+  static const int otaStatusAck = 0x10;
+  static const int otaStatusStartFail = 0x11;
+  static const int otaStatusCrcFail = 0x12;
+  static const int otaStatusCrcOk = 0x13;
+
+  // Sliding-window flow control. Phone keeps up to otaWindowBytes in flight;
+  // ESP32 acks every otaAckIntervalBytes written. Tuned for ~30-50 KB/s on a
+  // 512-byte MTU with 2M PHY.
+  static const int otaWindowBytes = 16 * 1024;
+  static const int otaAckIntervalBytes = 4096;
+  static const int otaChunkCeiling = 180;
+
+  static const Duration otaStartAckTimeout = Duration(seconds: 10);
+  static const Duration otaFinalAckTimeout = Duration(seconds: 30);
+  static const Duration otaChunkSpacing = Duration(milliseconds: 4);
+
   static const int targetMtu = 512;
 
   static const String cmdGetDeviceInfo = 'get_device_info';

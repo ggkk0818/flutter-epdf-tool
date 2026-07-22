@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../state/ble_providers.dart';
 import '../../shared/ble/models.dart';
+import '../../shared/ota/firmware_manifest.dart';
+import 'ota_update_page.dart';
 import 'widgets/device_list_item.dart';
 
 class DevicesPage extends ConsumerStatefulWidget {
@@ -14,12 +17,84 @@ class DevicesPage extends ConsumerStatefulWidget {
 }
 
 class _DevicesPageState extends ConsumerState<DevicesPage> {
+  final Set<String> _otaPromptedRemoteIds = <String>{};
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(activeConnectionProvider.notifier).reconnectIfOffline();
+      ref.listenManual(
+        activeConnectionProvider,
+        (AsyncValue<ActiveConnection>? prev,
+            AsyncValue<ActiveConnection> next) {
+          _checkForUpdate(next);
+        },
+      );
     });
+  }
+
+  /// Trigger an OTA-availability check each time the active connection lands
+  /// in a connected state with a fresh DeviceInfo. The set above prevents
+  /// re-prompting for the same device during the lifetime of this page.
+  Future<void> _checkForUpdate(AsyncValue<ActiveConnection> next) async {
+    final conn = next.valueOrNull;
+    if (conn == null) return;
+    if (conn.bluetoothState != BluetoothConnectionState.connected) return;
+    if (conn.isOffline) return;
+    final info = conn.info;
+    if (info == null) return;
+    final paired = ref.read(currentPairedDeviceProvider);
+    if (paired == null) return;
+    if (_otaPromptedRemoteIds.contains(paired.remoteId)) return;
+
+    final manifest = await FirmwareManifest.loadLatest();
+    if (manifest == null) return;
+    if (info.firmwareVersion.isEmpty) return;
+    if (compareSemver(manifest.version, info.firmwareVersion) <= 0) return;
+
+    _otaPromptedRemoteIds.add(paired.remoteId);
+    if (!mounted) return;
+    _showOtaPrompt(paired, manifest);
+  }
+
+  void _showOtaPrompt(
+      PairedDevice device, FirmwareManifest manifest) async {
+    final displayName = device.displayName.isEmpty
+        ? device.remoteId
+        : device.displayName;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('发现新固件'),
+        content: Text(
+          '设备「$displayName」有新固件可用，是否更新？\n'
+          '版本号：${manifest.version}\n'
+          '更新说明：${manifest.changelog.isEmpty ? "（暂无）" : manifest.changelog}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('更新'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true) return;
+    if (!mounted) return;
+    context.push(
+      '/devices/ota',
+      extra: OtaUpdatePageArgs(
+        remoteId: device.remoteId,
+        version: manifest.version,
+        changelog: manifest.changelog,
+        assetPath: manifest.assetPath,
+      ),
+    );
   }
 
   Future<void> _onSelectDevice(PairedDevice device) async {
