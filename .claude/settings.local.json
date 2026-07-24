@@ -3,7 +3,8 @@
     "allow": [
       "Bash(ls C:\\\\Code\\\\flutter-epdf-tool\\\\ *)",
       "Bash(flutter pub *)",
-      "Bash(flutter analyze *)"
+      "Bash(flutter analyze *)",
+      "Bash(xargs grep *)"
     ]
   }
 }

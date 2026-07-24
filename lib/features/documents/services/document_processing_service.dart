@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
@@ -161,8 +162,70 @@ class DocumentProcessingService {
             height: fitted.height,
             interpolation: img.Interpolation.average,
           );
-    img.luminanceThreshold(resized, threshold: 0.72);
+    _floydSteinbergDither(resized, threshold: 0.72);
     return resized;
+  }
+
+  void _floydSteinbergDither(
+    img.Image image, {
+    required double threshold,
+    bool serpentine = true,
+  }) {
+    final width = image.width;
+    final height = image.height;
+    final luminance = Float32List(width * height);
+
+    for (final p in image) {
+      final y =
+          0.3 * p.rNormalized +
+          0.59 * p.gNormalized +
+          0.11 * p.bNormalized;
+      luminance[p.y * width + p.x] = y;
+    }
+
+    for (int y = 0; y < height; y++) {
+      final dir = (serpentine && (y.isOdd)) ? -1 : 1;
+      final xStart = dir == 1 ? 0 : width - 1;
+      final xEnd = dir == 1 ? width : -1;
+      final hasNextRow = y + 1 < height;
+
+      for (int x = xStart; x != xEnd; x += dir) {
+        final idx = y * width + x;
+        final old = luminance[idx];
+        final newV = old < threshold ? 0.0 : 1.0;
+        luminance[idx] = newV;
+        final err = old - newV;
+        if (err == 0) {
+          continue;
+        }
+
+        final xAhead = x + dir;
+        if (xAhead >= 0 && xAhead < width) {
+          luminance[idx + dir] += err * (7.0 / 16.0);
+          if (hasNextRow) {
+            final aheadNext = (y + 1) * width + xAhead;
+            luminance[aheadNext] += err * (1.0 / 16.0);
+          }
+        }
+        if (hasNextRow) {
+          final behindX = x - dir;
+          if (behindX >= 0 && behindX < width) {
+            luminance[(y + 1) * width + behindX] += err * (3.0 / 16.0);
+          }
+          luminance[(y + 1) * width + x] += err * (5.0 / 16.0);
+        }
+      }
+    }
+
+    for (final p in image) {
+      final v = luminance[p.y * width + p.x];
+      final c = v < 0.5 ? 0 : p.maxChannelValue;
+      p
+        ..r = c
+        ..g = c
+        ..b = c
+        ..a = p.maxChannelValue;
+    }
   }
 
   Future<img.Image> _loadSourceImage(
