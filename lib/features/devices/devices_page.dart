@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../state/ble_providers.dart';
+import '../../state/network_providers.dart';
 import '../../shared/ble/models.dart';
 import '../../shared/ota/firmware_manifest.dart';
 import 'ota_update_page.dart';
@@ -24,6 +25,11 @@ class _DevicesPageState extends ConsumerState<DevicesPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(activeConnectionProvider.notifier).reconnectIfOffline();
+      final current = ref.read(activeConnectionProvider);
+      // Check immediately if a device is already connected when this page
+      // is entered (e.g. user navigates away and back). Subsequent state
+      // changes are handled by the listener below.
+      _checkForUpdate(current);
       ref.listenManual(
         activeConnectionProvider,
         (AsyncValue<ActiveConnection>? prev,
@@ -48,10 +54,11 @@ class _DevicesPageState extends ConsumerState<DevicesPage> {
     if (paired == null) return;
     if (_otaPromptedRemoteIds.contains(paired.remoteId)) return;
 
-    final manifest = await FirmwareManifest.loadLatest();
+    final manifest = await ref
+        .read(otaManifestServiceProvider)
+        .fetchLatestFirmware(currentVersion: info.firmwareVersion);
     if (manifest == null) return;
     if (info.firmwareVersion.isEmpty) return;
-    if (compareSemver(manifest.version, info.firmwareVersion) <= 0) return;
 
     _otaPromptedRemoteIds.add(paired.remoteId);
     if (!mounted) return;
@@ -92,7 +99,6 @@ class _DevicesPageState extends ConsumerState<DevicesPage> {
         remoteId: device.remoteId,
         version: manifest.version,
         changelog: manifest.changelog,
-        assetPath: manifest.assetPath,
       ),
     );
   }

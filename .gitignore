@@ -27,3 +27,7 @@ pnpm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local env overrides (runtime replaces .env.prod when present)
+assets/env/.env.local
+.env.local
