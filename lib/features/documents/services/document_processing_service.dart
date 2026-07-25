@@ -171,15 +171,16 @@ class DocumentProcessingService {
             flattened,
             width: fitted.width,
             height: fitted.height,
-            interpolation: img.Interpolation.average,
+            interpolation: img.Interpolation.cubic,
           );
-    img.luminanceThreshold(resized, threshold: 0.72);
+    img.convolution(resized, filter: [0, -1, 0, -1, 5, -1, 0, -1, 0], amount: 0.3);
+    img.luminanceThreshold(resized, threshold: 0.85);
     // _bradleyRothBinarize(resized);
     // _floydSteinbergDither(resized, threshold: 0.5, serpentine: true);
     return resized;
   }
 
-  void _bradleyRothBinarize(img.Image image, {int window = 11, double t = 0.15}) {
+  void _bradleyRothBinarize(img.Image image, {int window = 21, double t = 0.15}) {
     final W = image.width;
     final H = image.height;
 
