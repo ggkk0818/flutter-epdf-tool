@@ -29,7 +29,18 @@ class DocumentProcessingService {
     try {
       for (int index = 0; index < document.pages.length; index++) {
         final page = document.pages[index];
-        final previewImage = await _renderPdfPageImage(page, maxSide: 1200);
+        final previewSize = _fitWithin(
+          page.width.round().clamp(1, 1 << 20),
+          page.height.round().clamp(1, 1 << 20),
+          1200,
+          1200,
+          allowUpscale: true,
+        );
+        final previewImage = await _renderPdfPageImage(
+          page,
+          width: previewSize.width,
+          height: previewSize.height,
+        );
         final previewPath = p.join(
           sessionDir.path,
           'preview_${(index + 1).toString().padLeft(3, '0')}.png',
@@ -162,8 +173,59 @@ class DocumentProcessingService {
             height: fitted.height,
             interpolation: img.Interpolation.average,
           );
-    _floydSteinbergDither(resized, threshold: 0.72);
+    img.luminanceThreshold(resized, threshold: 0.72);
+    // _bradleyRothBinarize(resized);
+    // _floydSteinbergDither(resized, threshold: 0.5, serpentine: true);
     return resized;
+  }
+
+  void _bradleyRothBinarize(img.Image image, {int window = 11, double t = 0.15}) {
+    final W = image.width;
+    final H = image.height;
+
+    final lum = Uint8List(W * H);
+    for (final p in image) {
+      final v = 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
+      lum[p.y * W + p.x] = v < 0 ? 0 : (v > 255 ? 255 : v.round());
+    }
+
+    final stride = W + 1;
+    final sat = Float64List((H + 1) * stride);
+    for (int y = 1; y <= H; y++) {
+      double rowSum = 0;
+      final prevRowBase = (y - 1) * stride;
+      final curRowBase = y * stride;
+      for (int x = 1; x <= W; x++) {
+        rowSum += lum[(y - 1) * W + (x - 1)];
+        sat[curRowBase + x] = sat[prevRowBase + x] + rowSum;
+      }
+    }
+
+    final half = window ~/ 2;
+    final factor = 1.0 - t;
+    for (final p in image) {
+      final x = p.x;
+      final y = p.y;
+      final xLeft = (x - half).clamp(0, W);
+      final xRight = (x + half + 1).clamp(0, W);
+      final yTop = (y - half).clamp(0, H);
+      final yBot = (y + half + 1).clamp(0, H);
+
+      final sum = sat[yBot * stride + xRight] -
+          sat[yBot * stride + xLeft] -
+          sat[yTop * stride + xRight] +
+          sat[yTop * stride + xLeft];
+
+      final cnt = (yBot - yTop) * (xRight - xLeft);
+      final thresh = (sum / cnt) * factor;
+
+      final c = lum[y * W + x] < thresh ? 0 : 255;
+      p
+        ..r = c
+        ..g = c
+        ..b = c
+        ..a = p.maxChannelValue;
+    }
   }
 
   void _floydSteinbergDither(
@@ -238,9 +300,18 @@ class DocumentProcessingService {
         final document = await PdfDocument.openFile(item.sourcePath);
         try {
           final page = document.pages[item.pageNumber! - 1];
-          final maxSide =
-              math.max(deviceInfo.viewportWidth, deviceInfo.viewportHeight) * 2;
-          return _renderPdfPageImage(page, maxSide: math.max(maxSide, 1200));
+          final target = _fitWithin(
+            page.width.round().clamp(1, 1 << 20),
+            page.height.round().clamp(1, 1 << 20),
+            math.max(deviceInfo.viewportWidth, 1),
+            math.max(deviceInfo.viewportHeight, 1),
+            allowUpscale: true,
+          );
+          return _renderPdfPageImage(
+            page,
+            width: target.width,
+            height: target.height,
+          );
         } finally {
           await document.dispose();
         }
@@ -256,20 +327,14 @@ class DocumentProcessingService {
 
   Future<img.Image> _renderPdfPageImage(
     PdfPage page, {
-    required int maxSide,
+    required int width,
+    required int height,
   }) async {
-    final pageSize = _fitWithin(
-      page.width.round().clamp(1, 1 << 20),
-      page.height.round().clamp(1, 1 << 20),
-      maxSide,
-      maxSide,
-      allowUpscale: true,
-    );
     final rendered = await page.render(
-      width: pageSize.width,
-      height: pageSize.height,
-      fullWidth: pageSize.width.toDouble(),
-      fullHeight: pageSize.height.toDouble(),
+      width: width,
+      height: height,
+      fullWidth: width.toDouble(),
+      fullHeight: height.toDouble(),
     );
     if (rendered == null) {
       throw const DocumentTransferException('PDF 页面渲染失败，请重试。');
