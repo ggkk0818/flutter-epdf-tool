@@ -114,6 +114,7 @@ class DocumentUploadState {
     this.sourceType,
     this.documentType = DocumentType.document,
     this.documentName = '',
+    this.isPreparing = false,
     this.progress,
     this.failureReason,
     this.success,
@@ -121,11 +122,12 @@ class DocumentUploadState {
 
   const DocumentUploadState.initial()
       : step = DocumentUploadStep.chooseSource,
-        previewLayout = DocumentPreviewLayout.list,
+        previewLayout = DocumentPreviewLayout.grid,
         items = const <DocumentPreviewItem>[],
         sourceType = null,
         documentType = DocumentType.document,
         documentName = '',
+        isPreparing = false,
         progress = null,
         failureReason = null,
         success = null;
@@ -136,6 +138,7 @@ class DocumentUploadState {
   final DocumentType documentType;
   final List<DocumentPreviewItem> items;
   final String documentName;
+  final bool isPreparing;
   final DocumentTransferProgress? progress;
   final String? failureReason;
   final DocumentTransferSuccess? success;
@@ -155,6 +158,7 @@ class DocumentUploadState {
     DocumentType? documentType,
     List<DocumentPreviewItem>? items,
     String? documentName,
+    bool? isPreparing,
     DocumentTransferProgress? progress,
     String? failureReason,
     DocumentTransferSuccess? success,
@@ -169,6 +173,7 @@ class DocumentUploadState {
       documentType: documentType ?? this.documentType,
       items: items ?? this.items,
       documentName: documentName ?? this.documentName,
+      isPreparing: isPreparing ?? this.isPreparing,
       progress: clearProgress ? null : (progress ?? this.progress),
       failureReason: clearFailure ? null : (failureReason ?? this.failureReason),
       success: clearSuccess ? null : (success ?? this.success),

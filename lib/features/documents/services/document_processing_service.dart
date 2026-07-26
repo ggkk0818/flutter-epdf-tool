@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:pdfrx/pdfrx.dart';
@@ -11,6 +12,45 @@ import '../../../shared/ble/models.dart';
 import '../../../shared/storage/document_cache_store.dart';
 import '../document_naming.dart';
 import '../document_upload_models.dart';
+
+const int _kPreviewMaxDimension = 1200;
+
+@pragma('vm:entry-point')
+Uint8List? _processPreviewImageForIsolate(Uint8List bytes) {
+  try {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) {
+      return null;
+    }
+
+    final srcW = decoded.width;
+    final srcH = decoded.height;
+    final longest = math.max(srcW, srcH);
+    final scale = longest > _kPreviewMaxDimension
+        ? _kPreviewMaxDimension / longest
+        : 1.0;
+
+    img.Image working;
+    if (scale < 1.0) {
+      working = img.copyResize(
+        decoded,
+        width: (srcW * scale).round(),
+        height: (srcH * scale).round(),
+        interpolation: img.Interpolation.cubic,
+      );
+    } else {
+      working = decoded;
+    }
+
+    if (working.width > working.height) {
+      working = img.copyRotate(working, angle: 90);
+    }
+
+    return img.encodePng(working);
+  } on Object {
+    return null;
+  }
+}
 
 class DocumentProcessingService {
   DocumentProcessingService(this._cacheStore);
@@ -71,34 +111,66 @@ class DocumentProcessingService {
   Future<List<DocumentPreviewItem>> buildImagePreviewItems(List<String> paths) async {
     final sessionId = 'img_preview_${DateTime.now().millisecondsSinceEpoch}';
     final sessionDir = await _cacheStore.createSessionDirectory(sessionId);
-    final items = <DocumentPreviewItem>[];
 
-    for (int index = 0; index < paths.length; index++) {
-      final path = paths[index];
-      final bytes = await File(path).readAsBytes();
-      final decoded = img.decodeImage(bytes);
-      if (decoded == null) {
-        throw const DocumentTransferException('图片解析失败，请重新选择图片。');
-      }
-      final rotated = _rotateIfLandscape(decoded);
-      final previewPath = p.join(
+    final allBytes = await Future.wait(
+      paths.map((path) => _readImageBytes(path)),
+    );
+
+    final encodedList = await Future.wait(
+      allBytes.map((bytes) => compute(_processPreviewImageForIsolate, bytes)),
+    );
+
+    if (encodedList.any((bytes) => bytes == null)) {
+      throw const DocumentTransferException('图片解析失败，请重新选择图片。');
+    }
+
+    final previewPaths = List<String>.generate(paths.length, (index) {
+      return p.join(
         sessionDir.path,
         'preview_${(index + 1).toString().padLeft(3, '0')}.png',
       );
-      await File(previewPath).writeAsBytes(img.encodePng(rotated));
+    });
 
-      items.add(
-        DocumentPreviewItem(
-          id: 'img:$sessionId:$index:${path.hashCode}',
-          sourceKind: DocumentPreviewSourceKind.imageFile,
-          sourcePath: path,
-          previewPath: previewPath,
-          label: p.basename(path),
-        ),
+    await Future.wait(
+      List<Future<void>>.generate(paths.length, (index) {
+        return File(previewPaths[index]).writeAsBytes(encodedList[index]!);
+      }),
+    );
+
+    return List<DocumentPreviewItem>.generate(paths.length, (index) {
+      final path = paths[index];
+      return DocumentPreviewItem(
+        id: 'img:$sessionId:$index:${path.hashCode}',
+        sourceKind: DocumentPreviewSourceKind.imageFile,
+        sourcePath: path,
+        previewPath: previewPaths[index],
+        label: p.basename(path),
       );
-    }
+    });
+  }
 
-    return items;
+  Future<Uint8List> _readImageBytes(String path) async {
+    final ext = p.extension(path).toLowerCase();
+    if (ext == '.heic' || ext == '.heif') {
+      try {
+        final result = await FlutterImageCompress.compressWithFile(
+          path,
+          format: CompressFormat.jpeg,
+          quality: 95,
+          minWidth: 1200,
+          minHeight: 1200,
+        );
+        if (result == null) {
+          throw const DocumentTransferException('HEIC 图片解码失败，请重试。');
+        }
+        return result;
+      } on DocumentTransferException {
+        rethrow;
+      } on Object catch (e) {
+        throw DocumentTransferException('HEIC 图片解码失败，请重试。', e);
+      }
+    }
+    return File(path).readAsBytes();
   }
 
   Future<PreparedDocument> prepareDocumentForUpload({
@@ -359,7 +431,7 @@ class DocumentProcessingService {
           await document.dispose();
         }
       case DocumentPreviewSourceKind.imageFile:
-        final bytes = await File(item.sourcePath).readAsBytes();
+        final bytes = await _readImageBytes(item.sourcePath);
         final decoded = img.decodeImage(bytes);
         if (decoded == null) {
           throw const DocumentTransferException('图片解析失败，请重新选择图片。');

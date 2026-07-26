@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/documents/document_naming.dart';
 import '../features/documents/document_upload_models.dart';
@@ -17,12 +18,37 @@ final documentProcessingServiceProvider = Provider<DocumentProcessingService>((r
   return DocumentProcessingService(ref.watch(documentCacheStoreProvider));
 });
 
+const String _kPrefKeyDocumentType = 'add_document.default_type';
+
 class DocumentUploadController extends StateNotifier<DocumentUploadState> {
   DocumentUploadController(this._ref, this._processingService)
       : super(const DocumentUploadState.initial());
 
   final Ref _ref;
   final DocumentProcessingService _processingService;
+
+  Future<DocumentType> _loadSavedDocumentType() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final value = prefs.getString(_kPrefKeyDocumentType);
+      if (value == null) return DocumentType.document;
+      return DocumentType.values.firstWhere(
+        (t) => t.name == value,
+        orElse: () => DocumentType.document,
+      );
+    } on Object {
+      return DocumentType.document;
+    }
+  }
+
+  Future<void> _saveDocumentType(DocumentType type) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kPrefKeyDocumentType, type.name);
+    } on Object {
+      // ignore persistence failures
+    }
+  }
 
   Future<void> pickPdf() async {
     final result = await FilePicker.platform.pickFiles(
@@ -35,23 +61,32 @@ class DocumentUploadController extends StateNotifier<DocumentUploadState> {
       return;
     }
 
-    final items = await _processingService.buildPdfPreviewItems(path);
-    state = state.copyWith(
-      step: DocumentUploadStep.preview,
-      sourceType: DocumentSourceType.pdf,
-      items: items,
-      previewLayout: DocumentPreviewLayout.list,
-      documentType: DocumentType.document,
-      documentName: suggestDocumentNameFromPath(path),
-      clearFailure: true,
-      clearSuccess: true,
-      clearProgress: true,
-    );
+    state = state.copyWith(isPreparing: true, clearFailure: true);
+    try {
+      final savedType = await _loadSavedDocumentType();
+      final items = await _processingService.buildPdfPreviewItems(path);
+      state = state.copyWith(
+        step: DocumentUploadStep.preview,
+        sourceType: DocumentSourceType.pdf,
+        items: items,
+        previewLayout: DocumentPreviewLayout.grid,
+        documentType: savedType,
+        documentName: suggestDocumentNameFromPath(path),
+        isPreparing: false,
+        clearFailure: true,
+        clearSuccess: true,
+        clearProgress: true,
+      );
+    } on Object {
+      state = state.copyWith(isPreparing: false);
+      rethrow;
+    }
   }
 
   Future<void> pickImages({bool append = false}) async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
+      type: FileType.custom,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'heic', 'heif', 'webp'],
       allowMultiple: true,
     );
     if (result == null || result.files.isEmpty) {
@@ -67,23 +102,31 @@ class DocumentUploadController extends StateNotifier<DocumentUploadState> {
       return;
     }
 
-    final items = await _processingService.buildImagePreviewItems(paths);
-    final nextItems = append ? <DocumentPreviewItem>[...state.items, ...items] : items;
-    final suggestedName = append && state.documentName.isNotEmpty
-        ? state.documentName
-        : suggestDocumentNameFromPath(paths.first);
+    state = state.copyWith(isPreparing: true, clearFailure: true);
+    try {
+      final savedType = append ? state.documentType : await _loadSavedDocumentType();
+      final items = await _processingService.buildImagePreviewItems(paths);
+      final nextItems = append ? <DocumentPreviewItem>[...state.items, ...items] : items;
+      final suggestedName = append && state.documentName.isNotEmpty
+          ? state.documentName
+          : suggestDocumentNameFromPath(paths.first);
 
-    state = state.copyWith(
-      step: DocumentUploadStep.preview,
-      sourceType: DocumentSourceType.images,
-      items: nextItems,
-      previewLayout: DocumentPreviewLayout.list,
-      documentType: DocumentType.document,
-      documentName: suggestedName,
-      clearFailure: true,
-      clearSuccess: true,
-      clearProgress: true,
-    );
+      state = state.copyWith(
+        step: DocumentUploadStep.preview,
+        sourceType: DocumentSourceType.images,
+        items: nextItems,
+        previewLayout: DocumentPreviewLayout.grid,
+        documentType: savedType,
+        documentName: suggestedName,
+        isPreparing: false,
+        clearFailure: true,
+        clearSuccess: true,
+        clearProgress: true,
+      );
+    } on Object {
+      state = state.copyWith(isPreparing: false);
+      rethrow;
+    }
   }
 
   void setPreviewLayout(DocumentPreviewLayout layout) {
@@ -92,6 +135,7 @@ class DocumentUploadController extends StateNotifier<DocumentUploadState> {
 
   void setDocumentType(DocumentType type) {
     state = state.copyWith(documentType: type);
+    _saveDocumentType(type);
   }
 
   void updateDocumentName(String value) {

@@ -117,8 +117,10 @@ class _AddDocumentPageState extends ConsumerState<AddDocumentPage> {
         ),
         body: pageStatus != DocumentPageStatus.ready
             ? _DisconnectedGuard(theme: theme)
-            : _buildBody(context, state, theme, nameError),
-        bottomNavigationBar: pageStatus != DocumentPageStatus.ready
+            : state.isPreparing
+                ? const _PreparingStep()
+                : _buildBody(context, state, theme, nameError),
+        bottomNavigationBar: pageStatus != DocumentPageStatus.ready || state.isPreparing
             ? null
             : _buildBottomBar(state, nameError),
       ),
@@ -423,13 +425,14 @@ class _PreviewStep extends StatelessWidget {
                 type: state.documentType,
                 onChanged: onDocumentTypeChanged,
               ),
-              const Spacer(),
-              if (onAddImages != null)
+              if (onAddImages != null) ...[
+                const SizedBox(width: 8),
                 FilledButton.tonalIcon(
                   onPressed: onAddImages,
                   icon: const Icon(Icons.add_photo_alternate_outlined),
                   label: const Text('添加图片'),
                 ),
+              ],
             ],
           ),
         ),
@@ -659,6 +662,40 @@ class _ConfirmStep extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PreparingStep extends StatelessWidget {
+  const _PreparingStep();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 132,
+              height: 132,
+              child: CircularProgressIndicator(strokeWidth: 10),
+            ),
+            const SizedBox(height: 24),
+            Text('正在处理…', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              '正在将所选内容转为预览，请稍候。',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

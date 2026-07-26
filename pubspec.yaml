@@ -46,6 +46,7 @@ dependencies:
   pdfrx: ^2.4.7
   dio: 5.7.0
   flutter_dotenv: 5.2.1
+  flutter_image_compress: ^2.5.1
 
 dev_dependencies:
   flutter_test:

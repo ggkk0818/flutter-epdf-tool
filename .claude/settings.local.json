@@ -4,7 +4,11 @@
       "Bash(ls C:\\\\Code\\\\flutter-epdf-tool\\\\ *)",
       "Bash(flutter pub *)",
       "Bash(flutter analyze *)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "WebSearch",
+      "WebFetch(domain:pub.dev)",
+      "Bash(curl -s \"https://pub.dev/api/packages/flutter_image_compress\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('latest:', d['latest']['version']\\); print\\('sdk:', d['latest']['pubspec'].get\\('environment'\\)\\)\")"
     ]
   }
 }
