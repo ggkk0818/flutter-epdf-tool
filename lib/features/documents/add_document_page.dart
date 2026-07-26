@@ -146,6 +146,9 @@ class _AddDocumentPageState extends ConsumerState<AddDocumentPage> {
           onLayoutChanged: (layout) => ref
               .read(documentUploadControllerProvider.notifier)
               .setPreviewLayout(layout),
+          onDocumentTypeChanged: (type) => ref
+              .read(documentUploadControllerProvider.notifier)
+              .setDocumentType(type),
           onSelectionChanged: (itemId, selected) => ref
               .read(documentUploadControllerProvider.notifier)
               .toggleSelection(itemId, selected),
@@ -391,12 +394,14 @@ class _PreviewStep extends StatelessWidget {
   const _PreviewStep({
     required this.state,
     required this.onLayoutChanged,
+    required this.onDocumentTypeChanged,
     required this.onSelectionChanged,
     this.onAddImages,
   });
 
   final DocumentUploadState state;
   final ValueChanged<DocumentPreviewLayout> onLayoutChanged;
+  final ValueChanged<DocumentType> onDocumentTypeChanged;
   final void Function(String itemId, bool selected) onSelectionChanged;
   final VoidCallback? onAddImages;
 
@@ -409,34 +414,22 @@ class _PreviewStep extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
             children: [
-              Expanded(
-                child: SegmentedButton<DocumentPreviewLayout>(
-                  segments: const [
-                    ButtonSegment(
-                      value: DocumentPreviewLayout.list,
-                      icon: Icon(Icons.view_agenda_outlined),
-                      label: Text('大图'),
-                    ),
-                    ButtonSegment(
-                      value: DocumentPreviewLayout.grid,
-                      icon: Icon(Icons.grid_view_outlined),
-                      label: Text('网格'),
-                    ),
-                  ],
-                  selected: <DocumentPreviewLayout>{state.previewLayout},
-                  onSelectionChanged: (selection) {
-                    onLayoutChanged(selection.first);
-                  },
-                ),
+              _LayoutPopupMenu(
+                layout: state.previewLayout,
+                onChanged: onLayoutChanged,
               ),
-              if (onAddImages != null) ...[
-                const SizedBox(width: 12),
+              const SizedBox(width: 8),
+              _DocumentTypePopupMenu(
+                type: state.documentType,
+                onChanged: onDocumentTypeChanged,
+              ),
+              const Spacer(),
+              if (onAddImages != null)
                 FilledButton.tonalIcon(
                   onPressed: onAddImages,
                   icon: const Icon(Icons.add_photo_alternate_outlined),
                   label: const Text('添加图片'),
                 ),
-              ],
             ],
           ),
         ),
@@ -756,6 +749,154 @@ class _ResultStep extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LayoutPopupMenu extends StatelessWidget {
+  const _LayoutPopupMenu({required this.layout, required this.onChanged});
+
+  final DocumentPreviewLayout layout;
+  final ValueChanged<DocumentPreviewLayout> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PopupMenuButton<DocumentPreviewLayout>(
+      initialValue: layout,
+      onSelected: onChanged,
+      child: Material(
+        color: theme.colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                layout == DocumentPreviewLayout.list
+                    ? Icons.view_agenda_outlined
+                    : Icons.grid_view_outlined,
+                size: 18,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                layout == DocumentPreviewLayout.list ? '大图' : '网格',
+                style: theme.textTheme.labelLarge,
+              ),
+              const Icon(Icons.arrow_drop_down, size: 18),
+            ],
+          ),
+        ),
+      ),
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: DocumentPreviewLayout.list,
+          child: Row(
+            children: [
+              Icon(Icons.view_agenda_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('大图'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: DocumentPreviewLayout.grid,
+          child: Row(
+            children: [
+              Icon(Icons.grid_view_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('网格'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DocumentTypePopupMenu extends StatelessWidget {
+  const _DocumentTypePopupMenu({required this.type, required this.onChanged});
+
+  final DocumentType type;
+  final ValueChanged<DocumentType> onChanged;
+
+  String _label(DocumentType t) {
+    switch (t) {
+      case DocumentType.score:
+        return '乐谱';
+      case DocumentType.document:
+        return '文档';
+      case DocumentType.photo:
+        return '照片';
+    }
+  }
+
+  IconData _icon(DocumentType t) {
+    switch (t) {
+      case DocumentType.score:
+        return Icons.music_note_outlined;
+      case DocumentType.document:
+        return Icons.description_outlined;
+      case DocumentType.photo:
+        return Icons.photo_outlined;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PopupMenuButton<DocumentType>(
+      initialValue: type,
+      onSelected: onChanged,
+      child: Material(
+        color: theme.colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_icon(type), size: 18),
+              const SizedBox(width: 6),
+              Text(_label(type), style: theme.textTheme.labelLarge),
+              const Icon(Icons.arrow_drop_down, size: 18),
+            ],
+          ),
+        ),
+      ),
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: DocumentType.score,
+          child: Row(
+            children: [
+              Icon(Icons.music_note_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('乐谱'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: DocumentType.document,
+          child: Row(
+            children: [
+              Icon(Icons.description_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('文档'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: DocumentType.photo,
+          child: Row(
+            children: [
+              Icon(Icons.photo_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('照片'),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

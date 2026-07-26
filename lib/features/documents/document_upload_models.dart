@@ -2,6 +2,8 @@ enum DocumentSourceType { pdf, images }
 
 enum DocumentPreviewLayout { list, grid }
 
+enum DocumentType { score, document, photo }
+
 enum DocumentUploadStep { chooseSource, preview, confirm, progress, success, failure }
 
 enum DocumentUploadStage { converting, uploading }
@@ -110,6 +112,7 @@ class DocumentUploadState {
     required this.previewLayout,
     required this.items,
     this.sourceType,
+    this.documentType = DocumentType.document,
     this.documentName = '',
     this.progress,
     this.failureReason,
@@ -121,6 +124,7 @@ class DocumentUploadState {
         previewLayout = DocumentPreviewLayout.list,
         items = const <DocumentPreviewItem>[],
         sourceType = null,
+        documentType = DocumentType.document,
         documentName = '',
         progress = null,
         failureReason = null,
@@ -129,6 +133,7 @@ class DocumentUploadState {
   final DocumentUploadStep step;
   final DocumentSourceType? sourceType;
   final DocumentPreviewLayout previewLayout;
+  final DocumentType documentType;
   final List<DocumentPreviewItem> items;
   final String documentName;
   final DocumentTransferProgress? progress;
@@ -147,6 +152,7 @@ class DocumentUploadState {
     DocumentUploadStep? step,
     DocumentSourceType? sourceType,
     DocumentPreviewLayout? previewLayout,
+    DocumentType? documentType,
     List<DocumentPreviewItem>? items,
     String? documentName,
     DocumentTransferProgress? progress,
@@ -160,6 +166,7 @@ class DocumentUploadState {
       step: step ?? this.step,
       sourceType: sourceType ?? this.sourceType,
       previewLayout: previewLayout ?? this.previewLayout,
+      documentType: documentType ?? this.documentType,
       items: items ?? this.items,
       documentName: documentName ?? this.documentName,
       progress: clearProgress ? null : (progress ?? this.progress),

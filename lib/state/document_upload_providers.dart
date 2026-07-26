@@ -41,6 +41,7 @@ class DocumentUploadController extends StateNotifier<DocumentUploadState> {
       sourceType: DocumentSourceType.pdf,
       items: items,
       previewLayout: DocumentPreviewLayout.list,
+      documentType: DocumentType.document,
       documentName: suggestDocumentNameFromPath(path),
       clearFailure: true,
       clearSuccess: true,
@@ -66,7 +67,7 @@ class DocumentUploadController extends StateNotifier<DocumentUploadState> {
       return;
     }
 
-    final items = _processingService.buildImagePreviewItems(paths);
+    final items = await _processingService.buildImagePreviewItems(paths);
     final nextItems = append ? <DocumentPreviewItem>[...state.items, ...items] : items;
     final suggestedName = append && state.documentName.isNotEmpty
         ? state.documentName
@@ -77,6 +78,7 @@ class DocumentUploadController extends StateNotifier<DocumentUploadState> {
       sourceType: DocumentSourceType.images,
       items: nextItems,
       previewLayout: DocumentPreviewLayout.list,
+      documentType: DocumentType.document,
       documentName: suggestedName,
       clearFailure: true,
       clearSuccess: true,
@@ -86,6 +88,10 @@ class DocumentUploadController extends StateNotifier<DocumentUploadState> {
 
   void setPreviewLayout(DocumentPreviewLayout layout) {
     state = state.copyWith(previewLayout: layout);
+  }
+
+  void setDocumentType(DocumentType type) {
+    state = state.copyWith(documentType: type);
   }
 
   void updateDocumentName(String value) {
@@ -172,6 +178,7 @@ class DocumentUploadController extends StateNotifier<DocumentUploadState> {
         remoteId: remoteId,
         documentName: state.documentName.trim(),
         displayTime: displayTime,
+        documentType: state.documentType,
         onProgress: (progress) {
           state = state.copyWith(progress: progress);
         },

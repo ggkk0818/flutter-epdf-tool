@@ -36,11 +36,12 @@ class DocumentProcessingService {
           1200,
           allowUpscale: true,
         );
-        final previewImage = await _renderPdfPageImage(
+        var previewImage = await _renderPdfPageImage(
           page,
           width: previewSize.width,
           height: previewSize.height,
         );
+        previewImage = _rotateIfLandscape(previewImage);
         final previewPath = p.join(
           sessionDir.path,
           'preview_${(index + 1).toString().padLeft(3, '0')}.png',
@@ -67,18 +68,37 @@ class DocumentProcessingService {
     return items;
   }
 
-  List<DocumentPreviewItem> buildImagePreviewItems(List<String> paths) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return List<DocumentPreviewItem>.generate(paths.length, (index) {
+  Future<List<DocumentPreviewItem>> buildImagePreviewItems(List<String> paths) async {
+    final sessionId = 'img_preview_${DateTime.now().millisecondsSinceEpoch}';
+    final sessionDir = await _cacheStore.createSessionDirectory(sessionId);
+    final items = <DocumentPreviewItem>[];
+
+    for (int index = 0; index < paths.length; index++) {
       final path = paths[index];
-      return DocumentPreviewItem(
-        id: 'img:$now:$index:${path.hashCode}',
-        sourceKind: DocumentPreviewSourceKind.imageFile,
-        sourcePath: path,
-        previewPath: path,
-        label: p.basename(path),
+      final bytes = await File(path).readAsBytes();
+      final decoded = img.decodeImage(bytes);
+      if (decoded == null) {
+        throw const DocumentTransferException('图片解析失败，请重新选择图片。');
+      }
+      final rotated = _rotateIfLandscape(decoded);
+      final previewPath = p.join(
+        sessionDir.path,
+        'preview_${(index + 1).toString().padLeft(3, '0')}.png',
       );
-    }, growable: false);
+      await File(previewPath).writeAsBytes(img.encodePng(rotated));
+
+      items.add(
+        DocumentPreviewItem(
+          id: 'img:$sessionId:$index:${path.hashCode}',
+          sourceKind: DocumentPreviewSourceKind.imageFile,
+          sourcePath: path,
+          previewPath: previewPath,
+          label: p.basename(path),
+        ),
+      );
+    }
+
+    return items;
   }
 
   Future<PreparedDocument> prepareDocumentForUpload({
@@ -87,6 +107,7 @@ class DocumentProcessingService {
     required String remoteId,
     required String documentName,
     required String displayTime,
+    required DocumentType documentType,
     void Function(DocumentTransferProgress progress)? onProgress,
   }) async {
     final cacheKey = buildCanonicalDocumentKey(
@@ -112,7 +133,11 @@ class DocumentProcessingService {
         ),
       );
 
-      final displayImage = await _buildDisplayImage(items[index], deviceInfo);
+      final displayImage = await _buildDisplayImage(
+        items[index],
+        deviceInfo,
+        documentType,
+      );
       final pageNumber = (index + 1).toString().padLeft(3, '0');
       final previewPath = p.join(cacheDir.path, 'page_$pageNumber.png');
       final binPath = p.join(tempDir.path, 'page_$pageNumber.bin');
@@ -153,9 +178,11 @@ class DocumentProcessingService {
   Future<img.Image> _buildDisplayImage(
     DocumentPreviewItem item,
     DeviceInfo deviceInfo,
+    DocumentType documentType,
   ) async {
     final source = await _loadSourceImage(item, deviceInfo);
-    final flattened = _flattenOnWhite(source);
+    final oriented = _rotateIfLandscape(source);
+    final flattened = _flattenOnWhite(oriented);
     img.grayscale(flattened);
 
     final fitted = _fitWithin(
@@ -174,10 +201,25 @@ class DocumentProcessingService {
             interpolation: img.Interpolation.cubic,
           );
     img.convolution(resized, filter: [0, -1, 0, -1, 5, -1, 0, -1, 0], amount: 0.3);
-    // img.luminanceThreshold(resized, threshold: 0.85);
-    _bradleyRothBinarize(resized);
-    // _floydSteinbergDither(resized, threshold: 0.5, serpentine: true);
+    switch (documentType) {
+      case DocumentType.score:
+        img.luminanceThreshold(resized, threshold: 0.85);
+        break;
+      case DocumentType.document:
+        _bradleyRothBinarize(resized);
+        break;
+      case DocumentType.photo:
+        _floydSteinbergDither(resized, threshold: 0.5, serpentine: true);
+        break;
+    }
     return resized;
+  }
+
+  img.Image _rotateIfLandscape(img.Image image) {
+    if (image.width <= image.height) {
+      return image;
+    }
+    return img.copyRotate(image, angle: 90);
   }
 
   void _bradleyRothBinarize(img.Image image, {int window = 32, double t = 0.15}) {
