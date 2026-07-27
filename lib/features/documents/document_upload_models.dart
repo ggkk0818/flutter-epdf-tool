@@ -2,7 +2,7 @@ enum DocumentSourceType { pdf, images }
 
 enum DocumentPreviewLayout { list, grid }
 
-enum DocumentType { score, document, photo }
+enum DocumentType { score, thinScore, document, photo }
 
 enum DocumentUploadStep { chooseSource, preview, confirm, progress, success, failure }
 

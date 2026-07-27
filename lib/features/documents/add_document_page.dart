@@ -862,6 +862,8 @@ class _DocumentTypePopupMenu extends StatelessWidget {
     switch (t) {
       case DocumentType.score:
         return '乐谱';
+      case DocumentType.thinScore:
+        return '细线乐谱';
       case DocumentType.document:
         return '文档';
       case DocumentType.photo:
@@ -873,6 +875,8 @@ class _DocumentTypePopupMenu extends StatelessWidget {
     switch (t) {
       case DocumentType.score:
         return Icons.music_note_outlined;
+      case DocumentType.thinScore:
+        return Icons.queue_music_outlined;
       case DocumentType.document:
         return Icons.description_outlined;
       case DocumentType.photo:
@@ -910,6 +914,16 @@ class _DocumentTypePopupMenu extends StatelessWidget {
               Icon(Icons.music_note_outlined, size: 18),
               SizedBox(width: 8),
               Text('乐谱'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: DocumentType.thinScore,
+          child: Row(
+            children: [
+              Icon(Icons.queue_music_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('细线乐谱'),
             ],
           ),
         ),

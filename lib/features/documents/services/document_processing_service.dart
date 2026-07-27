@@ -277,6 +277,9 @@ class DocumentProcessingService {
       case DocumentType.score:
         img.luminanceThreshold(resized, threshold: 0.85);
         break;
+      case DocumentType.thinScore:
+        img.luminanceThreshold(resized, threshold: 0.5);
+        break;
       case DocumentType.document:
         _bradleyRothBinarize(resized);
         break;
