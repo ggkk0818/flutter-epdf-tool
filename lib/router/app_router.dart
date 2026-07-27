@@ -5,6 +5,7 @@ import '../features/devices/add_device_page.dart';
 import '../features/devices/devices_page.dart';
 import '../features/devices/ota_update_page.dart';
 import '../features/documents/add_document_page.dart';
+import '../features/documents/app_update_page.dart';
 import '../features/documents/document_detail_page.dart';
 import '../features/documents/document_page.dart';
 import '../features/documents/document_preview_page.dart';
@@ -71,6 +72,17 @@ final GoRouter appRouter = GoRouter(
           return const DevicesPage();
         }
         return OtaUpdatePage(args: args);
+      },
+    ),
+    GoRoute(
+      path: '/app-update',
+      name: 'app_update',
+      builder: (BuildContext context, GoRouterState state) {
+        final args = state.extra as AppUpdatePageArgs?;
+        if (args == null) {
+          return const DocumentPage();
+        }
+        return AppUpdatePage(args: args);
       },
     ),
     GoRoute(

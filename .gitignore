@@ -31,3 +31,6 @@ Thumbs.db
 # Local env overrides (runtime replaces .env.prod when present)
 assets/env/.env.local
 .env.local
+
+# OTA update binaries
+assets/ota/*.apk

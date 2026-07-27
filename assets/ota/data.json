@@ -18,6 +18,11 @@
     ],
     "app_versions": [
         {
+            "version": "1.0.1",
+            "release_date": "2026-07-26",
+            "changelog": "优化图像算法"
+        },
+        {
             "version": "1.0.0",
             "release_date": "2026-07-22",
             "changelog": "Initial release with basic features."

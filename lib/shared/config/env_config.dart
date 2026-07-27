@@ -21,4 +21,6 @@ class EnvConfig {
   static String get dataJsonUrl => '$baseUrl/data.json';
 
   static String firmwareUrl(String version) => '$baseUrl/firmware$version.bin';
+
+  static String appApkUrl(String version) => '$baseUrl/app-release$version.apk';
 }

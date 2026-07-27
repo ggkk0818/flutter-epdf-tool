@@ -3,12 +3,22 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../router/app_router.dart';
+import '../../shared/ota/firmware_manifest.dart';
 import '../../shared/widgets/device_status_chip.dart';
 import '../../state/ble_providers.dart';
 import '../../state/document_providers.dart';
+import '../../state/network_providers.dart';
+import 'app_update_page.dart';
 import 'widgets/document_list_item.dart';
+
+/// Session-scoped guard so the app-update check fires at most once per
+/// process lifetime. Resets when the OS kills the app, which is the
+/// desired behavior for "check on each cold launch".
+bool _appUpdateCheckedThisSession = false;
 
 class DocumentPage extends ConsumerStatefulWidget {
   const DocumentPage({super.key});
@@ -23,7 +33,75 @@ class _DocumentPageState extends ConsumerState<DocumentPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(documentListProvider.notifier).refresh();
+      if (!_appUpdateCheckedThisSession) {
+        _appUpdateCheckedThisSession = true;
+        _checkAppUpdate();
+      }
     });
+  }
+
+  /// Pull the remote manifest once per session and compare the highest
+  /// `app_versions` entry against the installed build. Silent on any
+  /// failure (network, parse) — never blocks the user.
+  Future<void> _checkAppUpdate() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final current = info.version;
+      final manifest = await ref
+          .read(otaManifestServiceProvider)
+          .fetchLatestApp(currentVersion: current);
+      if (manifest == null) return;
+      if (!mounted) return;
+      _showAppUpdatePrompt(manifest);
+    } on Object {
+      // best-effort: swallow, no surfacing to user
+    }
+  }
+
+  void _showAppUpdatePrompt(FirmwareManifest manifest) async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('发现新版本'),
+        content: Text(
+          '有新版本可用，是否更新？\n'
+          '版本号：${manifest.version}\n'
+          '更新说明：${manifest.changelog.isEmpty ? "（暂无）" : manifest.changelog}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('更新'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true) return;
+    if (!mounted) return;
+    await _requestInstallPermissionAndGo(manifest);
+  }
+
+  Future<void> _requestInstallPermissionAndGo(
+      FirmwareManifest manifest) async {
+    final status = await Permission.requestInstallPackages.request();
+    if (!mounted) return;
+    if (status.isGranted) {
+      context.push(
+        '/app-update',
+        extra: AppUpdatePageArgs(
+          version: manifest.version,
+          changelog: manifest.changelog,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('需要安装权限才能更新')),
+      );
+    }
   }
 
   Future<void> _refresh() async {

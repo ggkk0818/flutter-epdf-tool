@@ -3,6 +3,9 @@
          debug/profile變體由 Flutter 模板自動加入，release 必須在此宣告。 -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- App 自更新：Android 8+ 安装未知来源 APK 必须声明 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
     <!-- 告訴 Google Play Store 您的應用使用藍牙低功耗（BLE）
         如果藍牙是必需的，請將 android:required 設置為 "true" -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />

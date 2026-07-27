@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../shared/app_update/apk_downloader.dart';
 import '../shared/ota/firmware_downloader.dart';
 import '../shared/ota/ota_manifest_service.dart';
 
@@ -22,4 +23,8 @@ final otaManifestServiceProvider = Provider<OtaManifestService>((ref) {
 
 final firmwareDownloaderProvider = Provider<FirmwareDownloader>((ref) {
   return FirmwareDownloader(ref.watch(dioProvider));
+});
+
+final apkDownloaderProvider = Provider<ApkDownloader>((ref) {
+  return ApkDownloader(ref.watch(dioProvider));
 });
