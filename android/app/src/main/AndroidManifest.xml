@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Dio 網路請求（OTA 升級檢查、固件下載）需要 INTERNET 權限。
+         debug/profile變體由 Flutter 模板自動加入，release 必須在此宣告。 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <!-- 告訴 Google Play Store 您的應用使用藍牙低功耗（BLE）
         如果藍牙是必需的，請將 android:required 設置為 "true" -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
