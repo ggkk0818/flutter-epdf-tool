@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../shared/ble/ble_ota_connection.dart';
+import '../../shared/download_error_message.dart';
 import '../../shared/ota/ble_ota_uploader.dart';
 import '../../state/network_providers.dart';
 
@@ -119,16 +120,24 @@ class _OtaUpdatePageState extends ConsumerState<OtaUpdatePage> {
         onError: (Object e) {
           setState(() {
             _phase = _Phase.failure;
-            _statusText = '升级失败：$e';
-            _errorMessage = e.toString();
+            _statusText = downloadErrorMessage(
+              e,
+              noun: '固件',
+              fallback: '升级失败',
+            );
+            _errorMessage = null;
           });
         },
       );
     } on Object catch (e) {
       setState(() {
         _phase = _Phase.failure;
-        _statusText = '升级失败：$e';
-        _errorMessage = e.toString();
+        _statusText = downloadErrorMessage(
+          e,
+          noun: '固件',
+          fallback: '升级失败',
+        );
+        _errorMessage = null;
       });
     }
   }

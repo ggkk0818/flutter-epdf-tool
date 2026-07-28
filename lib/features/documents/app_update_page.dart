@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:open_filex/open_filex.dart';
 
+import '../../shared/download_error_message.dart';
 import '../../state/network_providers.dart';
 
 class AppUpdatePageArgs {
@@ -73,8 +74,8 @@ class _AppUpdatePageState extends ConsumerState<AppUpdatePage> {
       if (!mounted) return;
       setState(() {
         _phase = _Phase.failure;
-        _errorMessage = e.toString();
-        _statusText = '下载失败：$e';
+        _errorMessage = null;
+        _statusText = downloadErrorMessage(e);
       });
     }
   }
