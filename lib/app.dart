@@ -67,7 +67,12 @@ class _EpdfToolAppState extends ConsumerState<EpdfToolApp>
       title: 'EPDF Tool',
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F766E)),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF035AA6),
+        ).copyWith(
+          secondary: const Color(0xFF04B2D9),
+          surface: const Color(0xFFF2F2F2),
+        ),
         appBarTheme: const AppBarTheme(centerTitle: true),
       ),
       routerConfig: appRouter,

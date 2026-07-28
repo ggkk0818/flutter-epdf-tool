@@ -18,6 +18,11 @@
     ],
     "app_versions": [
         {
+            "version": "1.0.2",
+            "release_date": "2026-07-28",
+            "changelog": "调整主题色"
+        },
+        {
             "version": "1.0.1",
             "release_date": "2026-07-26",
             "changelog": "优化图像算法"
